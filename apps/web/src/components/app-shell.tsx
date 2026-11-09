@@ -1,15 +1,13 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { LogOut, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
-import { Badge, Button, cn, Skeleton } from '@zatma/ui';
-import { ROLE_LABELS } from '@zatma/types';
-import { api } from '@/lib/api';
+import { Badge, Button, cn } from '@zatma/ui';
 import { authClient } from '@/lib/auth-client';
 import { Logo } from './logo';
+import { OrgSwitcher } from './org-switcher';
 import { NAV } from './nav';
 import { ThemeToggle } from './theme-toggle';
 
@@ -17,7 +15,6 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const org = useQuery({ queryKey: ['organization', 'current'], queryFn: api.organizations.current });
 
   const signOut = async () => {
     await authClient.signOut();
@@ -74,14 +71,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
             <Menu />
           </Button>
           <div className="min-w-0 flex-1">
-            {org.isPending ? (
-              <Skeleton className="h-5 w-40" />
-            ) : org.data ? (
-              <div className="flex items-center gap-2">
-                <span className="truncate font-semibold">{org.data.name}</span>
-                <Badge tone="primary">{ROLE_LABELS[org.data.role]}</Badge>
-              </div>
-            ) : null}
+            <OrgSwitcher />
           </div>
           <ThemeToggle />
           <div className="hidden text-right sm:block">

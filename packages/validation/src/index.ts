@@ -4,8 +4,9 @@ export const LANGUAGES = ['en', 'ml', 'ar', 'hi', 'ta', 'kn', 'te'] as const;
 export const CURRENCIES = ['INR', 'AED', 'SAR', 'QAR', 'OMR', 'KWD', 'BHD', 'USD', 'EUR', 'GBP'] as const;
 
 const trimmed = (min: number, max: number) => z.string().trim().min(min).max(max);
+// Accepts a URL, '' or null (so the transformed output of a form can be re-validated by the API).
 const optionalUrl = z
-  .union([z.url({ protocol: /^https?$/ }), z.literal('')])
+  .union([z.url({ protocol: /^https?$/ }), z.literal(''), z.null()])
   .optional()
   .transform((v) => (v === '' ? null : v));
 
@@ -116,3 +117,49 @@ export const presignUploadSchema = z
   })
   .strict();
 export type PresignUploadInput = z.infer<typeof presignUploadSchema>;
+
+// ── Phase 2: auth flows ──
+export const passwordSchema = signUpSchema.shape.password;
+
+export const forgotPasswordSchema = z.object({ email: z.email() });
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z
+  .object({ password: passwordSchema, confirmPassword: z.string() })
+  .refine((v) => v.password === v.confirmPassword, { path: ['confirmPassword'], message: 'Passwords do not match' });
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const changePasswordSchema = z
+  .object({ currentPassword: z.string().min(1, 'Enter your current password'), newPassword: passwordSchema, confirmPassword: z.string() })
+  .refine((v) => v.newPassword === v.confirmPassword, { path: ['confirmPassword'], message: 'Passwords do not match' })
+  .refine((v) => v.newPassword !== v.currentPassword, { path: ['newPassword'], message: 'Choose a different password' });
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+// ── Phase 2: team ──
+/** Roles that can be assigned through invitations / role changes (ownership is not transferable via invite). */
+export const ASSIGNABLE_ROLES = ['ADMIN', 'MARKETING_MANAGER', 'CRM_MANAGER', 'SALES_AGENT', 'DESIGNER', 'ANALYST', 'VIEWER'] as const;
+
+export const inviteMemberSchema = z.object({
+  email: z.email().max(254),
+  role: z.enum(ASSIGNABLE_ROLES),
+});
+export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
+
+export const updateMemberRoleSchema = z.object({ role: z.enum([...ASSIGNABLE_ROLES, 'ORGANIZATION_OWNER']) });
+export type UpdateMemberRoleInput = z.infer<typeof updateMemberRoleSchema>;
+
+// ── Phase 2: organization logo ──
+export const setLogoSchema = z.object({ fileId: z.uuid() }).strict();
+export type SetLogoInput = z.infer<typeof setLogoSchema>;
+
+// ── Phase 2: billing ──
+export const PLAN_CODES = ['FREE', 'STARTER', 'PROFESSIONAL', 'BUSINESS', 'AGENCY'] as const;
+export const BILLING_INTERVALS = ['MONTHLY', 'YEARLY'] as const;
+
+export const checkoutSchema = z
+  .object({ plan: z.enum(['STARTER', 'PROFESSIONAL', 'BUSINESS']), interval: z.enum(BILLING_INTERVALS).default('MONTHLY') })
+  .strict();
+export type CheckoutInput = z.infer<typeof checkoutSchema>;
+
+export const changePlanSchema = z.object({ plan: z.enum(PLAN_CODES), interval: z.enum(BILLING_INTERVALS).default('MONTHLY') }).strict();
+export type ChangePlanInput = z.infer<typeof changePlanSchema>;

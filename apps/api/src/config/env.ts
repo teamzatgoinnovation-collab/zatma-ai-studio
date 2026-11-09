@@ -42,16 +42,39 @@ export const envSchema = z
     RAZORPAY_KEY_SECRET: optional,
     RAZORPAY_WEBHOOK_SECRET: optional,
 
+    /** Public URL of the web app (links in emails, OAuth redirects). Defaults to the first WEB_ORIGIN. */
+    WEB_URL: optional,
+
+    EMAIL_TRANSPORT: z.enum(['resend', 'capture']).default('capture'),
+    RESEND_API_KEY: optional,
+    EMAIL_FROM: z.string().default('ZatGo AI Marketing <no-reply@zatgoinnovation.com>'),
+    REQUIRE_EMAIL_VERIFICATION: bool.default(true),
+
+    TRIAL_PLAN: z.enum(['NONE', 'STARTER', 'PROFESSIONAL', 'BUSINESS']).default('PROFESSIONAL'),
+    TRIAL_DAYS: z.coerce.number().int().min(0).max(90).default(14),
+    BILLING_GRACE_DAYS: z.coerce.number().int().min(0).max(30).default(7),
+
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.BETTER_AUTH_SECRET.startsWith('change-me')) {
       ctx.addIssue({ code: 'custom', path: ['BETTER_AUTH_SECRET'], message: 'Set a real secret in production' });
     }
+    if (env.NODE_ENV === 'production' && env.EMAIL_TRANSPORT === 'capture') {
+      ctx.addIssue({ code: 'custom', path: ['EMAIL_TRANSPORT'], message: 'The capture transport is for development only; use resend in production' });
+    }
+    if (env.EMAIL_TRANSPORT === 'resend' && !env.RESEND_API_KEY) {
+      ctx.addIssue({ code: 'custom', path: ['RESEND_API_KEY'], message: 'RESEND_API_KEY is required when EMAIL_TRANSPORT=resend' });
+    }
+    const razorpay = [env.RAZORPAY_KEY_ID, env.RAZORPAY_KEY_SECRET, env.RAZORPAY_WEBHOOK_SECRET].filter(Boolean).length;
+    if (razorpay !== 0 && razorpay !== 3) {
+      ctx.addIssue({ code: 'custom', path: ['RAZORPAY_KEY_ID'], message: 'Set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET together, or none' });
+    }
     if (Boolean(env.GOOGLE_CLIENT_ID) !== Boolean(env.GOOGLE_CLIENT_SECRET)) {
       ctx.addIssue({ code: 'custom', path: ['GOOGLE_CLIENT_ID'], message: 'Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or neither' });
     }
-  });
+  })
+  .transform((env) => ({ ...env, WEB_URL: (env.WEB_URL ?? env.WEB_ORIGIN[0] ?? 'http://localhost:3000').replace(/\/$/, '') }));
 
 export type Env = z.infer<typeof envSchema>;
 

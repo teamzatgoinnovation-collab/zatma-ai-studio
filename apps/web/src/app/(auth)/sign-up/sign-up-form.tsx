@@ -2,15 +2,18 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Alert, Button, FieldError, Input, Label } from '@zatma/ui';
 import { signUpSchema, type SignUpInput } from '@zatma/validation';
+import { GoogleButton } from '@/components/google-button';
 import { authClient } from '@/lib/auth-client';
+import { absoluteUrl, safeRedirect } from '@/lib/redirect';
 
 export function SignUpForm() {
   const router = useRouter();
+  const next = safeRedirect(useSearchParams().get('next'), '/onboarding/organization');
   const [error, setError] = useState<string | null>(null);
   const {
     register,
@@ -20,16 +23,23 @@ export function SignUpForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
-    const { error: authError } = await authClient.signUp.email(values);
+    const { data, error: authError } = await authClient.signUp.email({ ...values, callbackURL: absoluteUrl(`/verify-email?status=verified&next=${encodeURIComponent(next)}`) });
     if (authError) {
       setError(authError.message ?? 'Could not create your account');
       return;
     }
-    router.replace('/onboarding/organization');
+    if (!data?.token) {
+      // Email verification required: no session until the link is opened.
+      router.replace(`/verify-email?email=${encodeURIComponent(values.email)}&next=${encodeURIComponent(next)}`);
+      return;
+    }
+    router.replace(next);
     router.refresh();
   });
 
   return (
+    <div className="space-y-4">
+    <GoogleButton callbackURL={next} />
     <form onSubmit={onSubmit} className="space-y-4" noValidate>
       {error && <Alert>{error}</Alert>}
       <div className="space-y-2">
@@ -60,5 +70,6 @@ export function SignUpForm() {
         Create account
       </Button>
     </form>
+    </div>
   );
 }

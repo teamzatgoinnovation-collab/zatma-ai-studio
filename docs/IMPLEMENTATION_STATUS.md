@@ -3,8 +3,8 @@
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Project planning & documentation | ✅ Completed |
-| 1 | Foundation & architecture | ✅ Completed (awaiting approval for Phase 2) |
-| 2 | Authentication, organizations & SaaS billing | ⏳ Pending |
+| 1 | Foundation & architecture | ✅ Completed |
+| 2 | Authentication, organizations & SaaS billing | ✅ Completed (awaiting approval for Phase 3) |
 | 3 | Modern SaaS UI/UX | ⏳ Pending |
 | 4 | AI provider integration | ⏳ Pending |
 | 5 | AI Design Studio | ⏳ Pending |
@@ -88,9 +88,95 @@ The tenant-scoped client also fails closed without a context. A Viewer can read 
 
 ### Remaining issues / notes
 * **Docker images and Compose were not built here.** The development container has no Docker daemon, so verification used locally installed PostgreSQL 16 and Redis 7. CI runs the same steps on GitHub Actions.
-* **MinIO upload round-trip not run.** Presigned URL generation is tested, but no object storage server was running here.
+* **MinIO upload round-trip not run.** Presigned URL generation is tested, but no object storage server was running here. (Resolved in Phase 2: the open-source MinIO server is archived, so local S3 now uses moto, and a real browser upload was verified.)
 * **Deferred to Phase 2 by design:** email verification, password reset, invitations and Razorpay. Google OAuth needs credentials.
 * **AI adapters are not implemented yet (Phase 4).** The registry reports providers honestly as "Not configured" or not implemented.
 
 ### Next phase
 **Phase 2: Authentication, organizations & SaaS management.** It covers email verification and password reset (email provider), Google OAuth, invitations and member role management, organization settings and logo upload, account deletion, Razorpay subscriptions (checkout, webhooks, upgrade/downgrade/cancel, invoices) and plan usage limits.
+
+## Phase 2: Authentication, organizations & SaaS billing (✅ Completed)
+
+### Features implemented
+* **Email:**
+  * Resend transport for production, plus a capture transport for dev and tests with an inbox at `GET /api/v1/dev/emails` (not registered in production).
+  * Delivery runs through a BullMQ `email` queue with retries and rate limiting.
+  * Branded, HTML-escaped templates: verify email, reset password, invitation, delete account, trial ending and payment failed.
+  * Links in emails always point at the public web URL.
+* **Authentication:**
+  * Email verification is required (configurable). Users can resend the link, and verification signs them in automatically.
+  * Forgot and reset password: the link is single-use, lasts 1 hour, and the reset revokes every session.
+  * Change password (signs out other devices), plus a list of active sessions with revoke.
+  * Account deletion with an email confirmation. Sole owners are blocked (with an eligibility check up front), and organizations where the user is the only member are deleted with the account.
+  * Google OAuth: the button appears only once credentials exist, and accounts link only for Google-verified emails.
+* **Organizations & team:**
+  * Invitations by email: 7-day expiry, resend, cancel, and accept or decline. The accept page also handles invitees who are signed out or don't have an account yet.
+  * Role changes and member removal take effect immediately, guarded by permissions and audited.
+  * Org switcher in the top bar, and the organization profile settings page (time zone, currency, language, industry, website).
+  * Logo upload: presigned PUT → upload completion check (size and type) → served through a signed URL.
+  * Owner-only organization deletion, blocked while a paid subscription is live.
+* **Subscriptions & billing (Razorpay):**
+  * `RazorpayProvider` implements customers, subscriptions, plan changes and cancellation against the REST API.
+  * Webhooks are verified with HMAC-SHA256 over the raw body and are idempotent through the `billing_event` table.
+  * Plan changes: upgrades apply immediately; downgrades are scheduled for period end and blocked while usage exceeds the target plan's limits.
+  * Cancelling a paid plan takes effect at period end; cancelling a trial ends it immediately.
+  * Failed payments move the subscription to PAST_DUE with a grace period (`BILLING_GRACE_DAYS`) and email the owners. When the grace period ends, the organization drops to Free.
+  * New organizations get a 14-day Professional trial (`TRIAL_PLAN`, `TRIAL_DAYS`). An hourly BullMQ job sends trial reminders and handles trial and grace-period expiry.
+  * Invoices and payments are recorded from webhooks.
+  * Without keys, a `DisabledPaymentProvider` makes every payment action return `503 BILLING_NOT_CONFIGURED`, and the UI explains that payments aren't enabled yet.
+* **Usage limits:** `UsageService` enforces plan limits on members (members plus pending invitations), workspaces and storage, returning `402 PLAN_LIMIT_REACHED`. AI credits and social accounts are tracked for Phases 4 and 9.
+* **Web pages:** verify email, forgot and reset password, accept invitation, Team, Settings (Organization and Account tabs), and Billing (plans with a monthly/yearly toggle, usage meters, Razorpay Checkout, invoices).
+* **Infrastructure:** the open-source MinIO server is archived, so local S3 in Docker Compose is now the moto emulator, and its bucket CORS rules are created automatically.
+
+### Database changes
+Migration `20261109023403_phase2_billing`:
+* `plan`: added `razorpayPlanIdMonthly` and `razorpayPlanIdYearly`.
+* `subscription`: added `pendingPlanId`, `pendingInterval`, `graceUntil`, `providerCustomerId` and `trialReminderSentAt`.
+* New tables `invoice` and `payment` (both tenant-scoped) and `billing_event` (platform-level).
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Lint, all packages | ✅ |
+| Typecheck, all packages | ✅ |
+| Unit tests (types 6, validation 5, sdk 3, api 19) | ✅ 33 passed |
+| API e2e against real PostgreSQL + Redis (6 files) | ✅ 52 passed |
+| Production build (API + web) | ✅ |
+| Browser flow (Playwright) | ✅ |
+
+Unit tests cover Razorpay signatures, event parsing and the HTTP client, email escaping, and the env rules.
+
+The e2e suites cover:
+* **Auth flows:** verification required, verification link, tampered tokens, reset with session revocation, no account enumeration, and deletion eligibility and confirmation.
+* **Team:** invite, accept and public details; unknown roles and non-admins rejected; role change takes effect; removal; member and workspace limits.
+* **Billing:** trial, disabled billing, checkout validation, owner-only management, checkout calls, bad signatures, activation, invoice and idempotency, upgrade and downgrade, downgrade blocked by limits, PAST_DUE and grace, cancellation to Free, maintenance job, ending a trial.
+* **Storage and logo:** upload completion checks, logo plus signed URLs, non-logo files rejected, other tenants' files rejected, storage limit.
+* **Tenant isolation:** extended to invitations, invoices and subscriptions.
+
+The browser flow ran against the real API, PostgreSQL, Redis and the moto S3 server:
+1. Sign up, then confirm that sign-in is blocked while the email is unverified.
+2. Verify through the emailed link, onboard, and see the trial on the Billing page with the "payments not enabled" notice.
+3. Invite a designer. As the invitee, open the email link, create an account, verify, and accept.
+4. As the owner, change the invitee's role, and confirm their access updates.
+5. Upload a logo directly to S3, and save the organization settings.
+6. Check the account tab and its session list.
+7. Reset the password through the emailed link, then sign in with the new password.
+8. Take dark-mode and mobile screenshots.
+
+The only console error is the intentional 403 from the unverified sign-in attempt.
+
+### Remaining issues and pending setup
+* **Razorpay live checkout untested.** It has not been run against real Razorpay, because there are no keys yet. Request shapes follow Razorpay's documented API and are tested with a fake client. To go live, follow the checklist in [INTEGRATIONS.md](./INTEGRATIONS.md#razorpay-subscriptions): keys, plan ids and webhook.
+* **Resend not tested with real delivery.** It needs `RESEND_API_KEY` and a verified sending domain.
+* **Google sign-in needs credentials.** It requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+* **Organizations with a pending paid plan** (checkout started but not yet activated) keep their trial until Razorpay sends `subscription.activated`.
+* **Undoing a scheduled cancellation is not possible in-app.** Razorpay can't undo cancel-at-period-end, so the customer re-subscribes after the period ends.
+* **Docker images still not built here** (no Docker daemon in this environment).
+
+### Next phase
+**Phase 3: Modern SaaS UI/UX.** It covers:
+* the full design system and component library
+* command search, breadcrumbs and a notifications panel
+* collapsible sidebar groups for every module
+* consistent loading, empty and error states
+* an accessibility pass and responsive polish

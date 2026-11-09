@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, type PlanCode } from '../src/generated/prisma/client.js';
 
@@ -28,6 +27,7 @@ export async function seedPlans(prisma: PrismaClient): Promise<void> {
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
+  await import('dotenv/config');
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is not set');
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });

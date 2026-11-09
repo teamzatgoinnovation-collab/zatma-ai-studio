@@ -14,7 +14,7 @@ zatma-ai-studio/
 │   ├── ui/                  Shared React UI primitives (shadcn/ui style)
 │   └── sdk/                 Typed API client consumed by web
 ├── infrastructure/
-│   └── docker/              docker-compose (Postgres, Redis, MinIO) + Dockerfiles
+│   └── docker/              docker-compose (Postgres, Redis, S3 emulator) + Dockerfiles
 ├── docs/
 └── .github/workflows/       CI
 ```
@@ -26,7 +26,7 @@ Browser ──► Next.js web (apps/web) ──► NestJS API (apps/api, /api/v1
    │                                    │  ├─ Better Auth handler  (/api/auth/*)
    │                                    │  ├─ Prisma ──► PostgreSQL
    │  (cookies: same-site session)      │  ├─ BullMQ producers ──► Redis
-   └────────────────────────────────────┘  └─ S3 client ──► MinIO (dev) / Cloudflare R2 (prod)
+   └────────────────────────────────────┘  └─ S3 client ──► S3 emulator (dev) / Cloudflare R2 (prod)
 
 BullMQ workers (same codebase, separate process in prod)
    ├─ notifications   ├─ ai-generation (Phase 4+)   ├─ social-publish (Phase 10)
@@ -146,7 +146,7 @@ chosen in Phase 1:
 | Language | TypeScript 6.0 (strict) |
 | Frontend | Next.js 16, React 19, Tailwind CSS 4, TanStack Query 5, React Hook Form, Zod 4, next-themes, Lucide |
 | Backend | NestJS 12 (native ESM), Prisma 7 (`prisma-client` generator + `@prisma/adapter-pg`), Better Auth 1.x, BullMQ, nestjs-pino, @nestjs/swagger, @nestjs/throttler, Helmet |
-| Data | PostgreSQL 16, Redis 7, S3-compatible storage (MinIO dev / R2 prod) |
+| Data | PostgreSQL 16, Redis 7, S3-compatible storage (moto S3 emulator dev / R2 prod) |
 | Tests | Vitest (API unit + e2e with Supertest against a real Postgres), Playwright (E2E) |
 | Build | Turborepo, Docker, GitHub Actions |
 

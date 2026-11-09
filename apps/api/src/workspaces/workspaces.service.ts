@@ -6,6 +6,7 @@ import { AppException, notFound } from '../common/errors.js';
 import { paginate, toSkipTake } from '../common/pagination.js';
 import { TenantContext } from '../common/tenant-context.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { UsageService } from '../billing/usage.service.js';
 
 const toDto = (w: WorkspaceRow): Workspace => ({
   id: w.id,
@@ -20,7 +21,10 @@ const toDto = (w: WorkspaceRow): Workspace => ({
 /** All queries go through `prisma.tenant`, which confines them to the active organization. */
 @Injectable()
 export class WorkspacesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usage: UsageService,
+  ) {}
 
   private get db() {
     return this.prisma.tenant;
@@ -41,6 +45,7 @@ export class WorkspacesService {
   }
 
   async create(input: CreateWorkspaceInput): Promise<Workspace> {
+    await this.usage.assertWithinLimit(TenantContext.requireOrganizationId(), 'workspaces');
     const row = await this.db.workspace.create({
       data: { organizationId: TenantContext.requireOrganizationId(), name: input.name, description: input.description ?? null },
     });

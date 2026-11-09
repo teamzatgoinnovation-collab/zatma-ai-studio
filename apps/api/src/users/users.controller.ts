@@ -25,4 +25,11 @@ export class UsersController {
   update(@CurrentAuth() auth: RequestAuth, @Body(new ZodValidationPipe(updateProfileSchema)) body: UpdateProfileInput) {
     return this.users.update(auth.userId, auth.activeOrganizationId, body);
   }
+
+  @Get('me/deletion-eligibility')
+  @SessionOnly()
+  @ApiOperation({ summary: 'Whether the account can be deleted (sole owners must transfer ownership first)' })
+  deletionEligibility(@CurrentAuth() auth: RequestAuth) {
+    return this.users.deletionEligibility(auth.userId);
+  }
 }

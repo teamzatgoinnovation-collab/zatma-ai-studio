@@ -39,4 +39,19 @@ describe('environment validation', () => {
   it('refuses placeholder secrets in production', () => {
     expect(() => loadEnv({ ...base, NODE_ENV: 'production', BETTER_AUTH_SECRET: 'change-me-' + 'x'.repeat(30) })).toThrow(/production/);
   });
+
+  it('requires a real email transport in production and complete Razorpay credentials', () => {
+    const prod = { ...base, NODE_ENV: 'production' };
+    expect(() => loadEnv(prod)).toThrow(/EMAIL_TRANSPORT/);
+    expect(() => loadEnv({ ...prod, EMAIL_TRANSPORT: 'resend' })).toThrow(/RESEND_API_KEY/);
+    expect(loadEnv({ ...prod, EMAIL_TRANSPORT: 'resend', RESEND_API_KEY: 're_x' }).EMAIL_TRANSPORT).toBe('resend');
+    expect(() => loadEnv({ ...base, RAZORPAY_KEY_ID: 'rzp' })).toThrow(/RAZORPAY/);
+  });
+
+  it('defaults WEB_URL to the first web origin and trial settings', () => {
+    const env = loadEnv(base);
+    expect(env.WEB_URL).toBe('http://localhost:3000');
+    expect(env.TRIAL_PLAN).toBe('PROFESSIONAL');
+    expect(env.TRIAL_DAYS).toBe(14);
+  });
 });

@@ -1,8 +1,10 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp } from '../src/app.factory.js';
+import { createTestApp } from './harness.js';
 import { MissingTenantError } from '../src/common/tenant-context.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import type { Server } from 'node:http';
+import request from 'supertest';
 import { api, createOrg, setActiveOrg, signUp, type TestUser } from './helpers.js';
 
 /**
@@ -18,8 +20,7 @@ describe('Tenant isolation (e2e)', () => {
   let workspaceA: string;
 
   beforeAll(async () => {
-    app = await createApp({ logger: false });
-    await app.init();
+    app = await createTestApp();
     alice = await signUp(app, 'Alice');
     bob = await signUp(app, 'Bob');
     orgA = await createOrg(app, alice, 'Org A');
@@ -84,6 +85,36 @@ describe('Tenant isolation (e2e)', () => {
     const logs = await api(app, bob).get('/audit-logs').expect(200);
     expect(JSON.stringify(logs.body)).not.toContain(workspaceA);
     expect(JSON.stringify(logs.body)).not.toContain(alice.userId);
+  });
+
+  it('scopes invitations, invoices and billing to the active organization', async () => {
+    const carol = await signUp(app, 'Carol');
+    await request(app.getHttpServer() as Server)
+      .post('/api/auth/organization/invite-member')
+      .set('Origin', 'http://localhost:3000')
+      .set('Cookie', alice.cookie)
+      .send({ email: carol.email, role: 'viewer', organizationId: orgA })
+      .expect(200);
+
+    const bobInvites = await api(app, bob).get('/organizations/current/invitations').expect(200);
+    expect(bobInvites.body.map((i: { email: string }) => i.email)).not.toContain(carol.email);
+
+    // Bob cannot invite into Org A, even by naming it explicitly.
+    const res = await request(app.getHttpServer() as Server)
+      .post('/api/auth/organization/invite-member')
+      .set('Origin', 'http://localhost:3000')
+      .set('Cookie', bob.cookie)
+      .send({ email: 'x@example.com', role: 'viewer', organizationId: orgA });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+
+    const prisma = app.get(PrismaService);
+    await prisma.system.invoice.create({ data: { organizationId: orgA, provider: 'razorpay', externalId: `inv_iso_${Date.now()}`, amount: '499', currency: 'INR', status: 'paid' } });
+    expect((await api(app, bob).get('/billing/invoices').expect(200)).body.meta.total).toBe(0);
+    expect((await api(app, alice).get('/billing/invoices').expect(200)).body.meta.total).toBe(1);
+
+    const sub = await api(app, bob).get('/billing/subscription').expect(200);
+    const subA = await prisma.system.subscription.findUniqueOrThrow({ where: { organizationId: orgA } });
+    expect(sub.body.currentPeriodStart).not.toBe(subA.currentPeriodStart.toISOString());
   });
 
   it('fails closed when tenant models are queried without a tenant context', async () => {
