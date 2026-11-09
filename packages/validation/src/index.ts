@@ -106,6 +106,8 @@ export const UPLOAD_MIME_TYPES = [
   'text/csv',
 ] as const;
 export const UPLOAD_PURPOSES = ['LOGO', 'BRAND_ASSET', 'DESIGN_ASSET', 'IMPORT', 'OTHER'] as const;
+/** Purposes only the server assigns (never accepted from upload requests). */
+export const SERVER_FILE_PURPOSES = ['AI_IMAGE'] as const;
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 export const presignUploadSchema = z
@@ -163,3 +165,46 @@ export type CheckoutInput = z.infer<typeof checkoutSchema>;
 
 export const changePlanSchema = z.object({ plan: z.enum(PLAN_CODES), interval: z.enum(BILLING_INTERVALS).default('MONTHLY') }).strict();
 export type ChangePlanInput = z.infer<typeof changePlanSchema>;
+
+// ── Phase 4: AI ──
+export const AI_PROVIDER_IDS = ['anthropic', 'openai', 'gemini'] as const;
+export const AI_PURPOSES = ['playground', 'copywriter', 'design', 'crm', 'assistant'] as const;
+
+export const generateTextSchema = z
+  .object({
+    prompt: z.string().trim().min(3, 'Write a longer prompt').max(8000),
+    system: z.string().trim().max(4000).optional(),
+    language: z.enum(LANGUAGES).optional(),
+    responseFormat: z.enum(['text', 'json']).default('text'),
+    maxOutputTokens: z.number().int().min(64).max(8000).default(2000),
+    provider: z.enum(AI_PROVIDER_IDS).optional(),
+    purpose: z.enum(AI_PURPOSES).default('playground'),
+  })
+  .strict();
+export type GenerateTextInput = z.infer<typeof generateTextSchema>;
+
+export const generateImageSchema = z
+  .object({
+    prompt: z.string().trim().min(3).max(4000),
+    width: z.number().int().min(256).max(4096).default(1080),
+    height: z.number().int().min(256).max(4096).default(1080),
+    count: z.number().int().min(1).max(4).default(1),
+    provider: z.enum(AI_PROVIDER_IDS).optional(),
+    purpose: z.enum(AI_PURPOSES).default('playground'),
+  })
+  .strict();
+export type GenerateImageInput = z.infer<typeof generateImageSchema>;
+
+export const createGenerationJobSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('TEXT'), input: generateTextSchema }).strict(),
+  z.object({ type: z.literal('IMAGE'), input: generateImageSchema }).strict(),
+]);
+export type CreateGenerationJobInput = z.infer<typeof createGenerationJobSchema>;
+
+export const aiSettingsSchema = z
+  .object({
+    textProvider: z.enum(AI_PROVIDER_IDS).nullable().optional(),
+    imageProvider: z.enum(AI_PROVIDER_IDS).nullable().optional(),
+  })
+  .strict();
+export type AISettingsInput = z.infer<typeof aiSettingsSchema>;

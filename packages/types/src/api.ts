@@ -131,8 +131,10 @@ export interface AIProviderInfo {
   capabilities: AICapability[];
   /** API key present in the server environment. */
   configured: boolean;
-  /** Adapter implemented and registered (Phase 4). */
+  /** Adapter registered and available for at least one capability. */
   implemented: boolean;
+  /** Default models per capability, e.g. { TEXT: 'claude-opus-5-5' }. */
+  models: Partial<Record<AICapability, string>>;
 }
 
 export type UsageMetric = keyof PlanLimits;
@@ -213,4 +215,45 @@ export interface StoredFileSummary {
   sizeBytes: number;
   purpose: string;
   status: string;
+}
+
+export interface AISettings {
+  textProvider: string | null;
+  imageProvider: string | null;
+  /** Effective fallback order after applying the organization's preference. */
+  textOrder: string[];
+  imageOrder: string[];
+}
+
+export interface TextGenerationResponse {
+  text: string;
+  provider: string;
+  model: string;
+  credits: number;
+  finishReason: 'stop' | 'length' | 'other';
+  /** Providers that failed before this one succeeded (fallback). */
+  fallbackFrom: string[];
+}
+
+export type GenerationStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+
+export interface GenerationJobSummary {
+  id: string;
+  type: AICapability;
+  status: GenerationStatus;
+  purpose: string;
+  provider: string | null;
+  model: string | null;
+  credits: number;
+  output: { text?: string; files?: Array<{ id: string; url: string; mimeType: string }> } | null;
+  error: { code: string; message: string } | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface AIUsageSummary {
+  periodStart: string;
+  credits: { used: number; limit: number };
+  byProvider: Array<{ provider: string; capability: AICapability; requests: number; failures: number; credits: number }>;
+  recent: Array<{ id: string; provider: string; model: string; capability: AICapability; status: 'SUCCEEDED' | 'FAILED'; credits: number; purpose: string | null; errorKind: string | null; createdAt: string }>;
 }

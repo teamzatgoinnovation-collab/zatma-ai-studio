@@ -188,8 +188,8 @@ export const NAV: NavSection[] = [
     label: 'Settings',
     href: '/settings',
     icon: Settings,
-    description: 'Organization profile and your account.',
-    keywords: ['profile', 'password', 'logo'],
+    description: 'Organization profile, AI providers and your account.',
+    keywords: ['profile', 'password', 'logo', 'ai', 'providers', 'credits'],
   },
 ];
 

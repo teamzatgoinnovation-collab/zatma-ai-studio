@@ -13,6 +13,8 @@ export interface ObjectStorage {
   presignPut(key: string, contentType: string, sizeBytes: number, expiresInSeconds: number): Promise<string>;
   presignGet(key: string, expiresInSeconds: number): Promise<string>;
   head(key: string): Promise<ObjectHead | null>;
+  /** Server-side write (generated assets). */
+  putObject(key: string, body: Buffer, contentType: string): Promise<void>;
 }
 
 export const OBJECT_STORAGE = Symbol('OBJECT_STORAGE');
@@ -38,6 +40,10 @@ export class S3ObjectStorage implements ObjectStorage {
 
   presignGet(key: string, expiresIn: number): Promise<string> {
     return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn });
+  }
+
+  async putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType, ContentLength: body.length }));
   }
 
   async head(key: string): Promise<ObjectHead | null> {

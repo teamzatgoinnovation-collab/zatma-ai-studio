@@ -96,7 +96,11 @@ export function Dashboard() {
             <CardTitle className="flex items-center gap-2">
               <Bot className="size-4 text-primary" aria-hidden="true" /> AI providers
             </CardTitle>
-            <CardDescription>Generation adapters are connected in Phase 4.</CardDescription>
+            <CardDescription>
+              <Link href="/settings?tab=ai" className="font-medium text-primary hover:underline">
+                AI settings &amp; usage
+              </Link>
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {providers.isPending && <Skeleton className="h-16" />}
@@ -106,9 +110,7 @@ export function Dashboard() {
                   <p className="text-sm font-medium">{p.name}</p>
                   <p className="text-xs text-muted-foreground">{p.capabilities.join(' · ')}</p>
                 </div>
-                <Badge tone={p.implemented ? 'success' : p.configured ? 'primary' : 'neutral'}>
-                  {p.implemented ? 'Active' : p.configured ? 'Key set' : 'Not configured'}
-                </Badge>
+                <Badge tone={p.implemented ? 'success' : 'neutral'}>{p.implemented ? 'Active' : 'Not configured'}</Badge>
               </div>
             ))}
           </CardContent>

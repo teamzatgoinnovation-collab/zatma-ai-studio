@@ -93,6 +93,27 @@ export class StorageService {
     return { url: await this.storage.presignGet(file.key, DOWNLOAD_URL_TTL_SECONDS), expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS };
   }
 
+  /** Stores server-generated content (e.g. AI images) for the active organization. Returns the file id. */
+  async storeGenerated(body: Buffer, mimeType: string, purpose: 'AI_IMAGE', fileName: string): Promise<{ id: string; key: string }> {
+    const organizationId = TenantContext.requireOrganizationId();
+    const key = StorageService.buildKey(organizationId, purpose, mimeType);
+    await this.storage.putObject(key, body, mimeType);
+    const file = await this.prisma.tenant.storedFile.create({
+      data: {
+        organizationId,
+        uploadedById: TenantContext.get()?.userId ?? null,
+        key,
+        bucket: this.storage.bucket,
+        fileName,
+        mimeType,
+        sizeBytes: body.length,
+        purpose,
+        status: 'UPLOADED',
+      },
+    });
+    return { id: file.id, key };
+  }
+
   /** Signed URL for a file by id without a tenant context (e.g. org logo for its own members). */
   async signedUrlForKey(key: string): Promise<string> {
     return this.storage.presignGet(key, DOWNLOAD_URL_TTL_SECONDS);

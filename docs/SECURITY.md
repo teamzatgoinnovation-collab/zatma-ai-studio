@@ -48,6 +48,12 @@
 * An `AuditInterceptor` records every mutating request (actor, org, action, resource, IP).
 * Structured logs come from Pino with request ids, and auth headers, cookies and tokens are redacted.
 
+## AI providers
+* Provider API keys exist only in the API process environment. The browser talks to `/api/v1/ai/*` only.
+* Prompts and outputs are never logged. Metering stores token counts, cost, model and a normalised error kind, never provider error text or content.
+* Plan credits are checked before every call. Generation endpoints have their own throttle (20/min).
+* Generated images are written to private object storage under the organization's prefix and served through short-lived signed URLs.
+
 ## Payments
 * Razorpay webhooks are verified with HMAC-SHA256 over the raw request body, compared in constant time. Invalid signatures get a 400.
 * Every event is stored in `billing_event`, unique on (provider, eventId). Redelivered events are no-ops, and a failed event is retried by Razorpay because the endpoint returns non-2xx.

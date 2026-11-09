@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, CreditCard, LogOut, Monitor, Moon, Sun, UserCog, UserPlus } from 'lucide-react';
+import { Building2, CreditCard, LogOut, Monitor, Moon, Sparkles, Sun, UserCog, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -82,6 +82,9 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                 </CommandItem>
                 <CommandItem value="Organization settings" keywords={['logo', 'timezone', 'currency']} onSelect={() => run(() => router.push('/settings'))}>
                   <Building2 aria-hidden="true" /> Organization settings
+                </CommandItem>
+                <CommandItem value="AI settings and usage" keywords={['ai', 'credits', 'providers', 'generate']} onSelect={() => run(() => router.push('/settings?tab=ai'))}>
+                  <Sparkles aria-hidden="true" /> AI settings &amp; usage
                 </CommandItem>
                 <CommandItem value="Account settings" keywords={['password', 'profile', 'sessions']} onSelect={() => run(() => router.push('/settings?tab=account'))}>
                   <UserCog aria-hidden="true" /> Account settings

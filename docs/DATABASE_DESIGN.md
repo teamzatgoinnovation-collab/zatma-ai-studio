@@ -20,7 +20,7 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 | `session` | ✅ P1 | id, token (unique), userId, expiresAt, ipAddress, userAgent, **activeOrganizationId** |
 | `account` | ✅ P1 | id, userId, providerId, accountId, password (hash), OAuth tokens |
 | `verification` | ✅ P1 | identifier, value, expiresAt |
-| `organization` | ✅ P1 | id, name, slug (unique), logo, website, industry, timezone, defaultLanguage, currency, metadata |
+| `organization` | ✅ P1 | id, name, slug (unique), logo, website, industry, timezone, defaultLanguage, currency, metadata, aiSettings (P4: preferred providers) |
 | `member` | ✅ P1 | id, organizationId, userId, role; unique(organizationId,userId) |
 | `invitation` | ✅ P1 | id, organizationId, email, role, status, expiresAt, inviterId |
 | `workspace` | ✅ P1 | id, organizationId, name, description, isDefault |
@@ -36,7 +36,7 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 | `invoice` | ✅ P2 | organizationId, subscriptionId, provider, externalId (unique), number, amount, currency, status, periodStart/End, invoiceUrl, issuedAt |
 | `payment` | ✅ P2 | organizationId, invoiceId, provider, externalId (unique), amount, currency, status, method, errorReason |
 | `billing_event` | ✅ P2 | provider + eventId (unique, idempotency), type, organizationId, payload, processedAt, error. Platform-level |
-| `ai_usage` | ✅ P1 | organizationId, userId?, capability (TEXT/IMAGE/VIDEO/EMBEDDING), provider, model, inputTokens, outputTokens, units, costMicroUsd, credits, status |
+| `ai_usage` | ✅ P1, P4 | organizationId, userId?, capability (TEXT/IMAGE/VIDEO/EMBEDDING), provider, model, inputTokens, outputTokens, units, costMicroUsd, credits, status, purpose, jobId, errorKind, latencyMs. One row per provider attempt |
 | `stored_file` | ✅ P1 | organizationId, uploadedById, key (unique), bucket, mimeType, sizeBytes, purpose, status |
 
 ## AI Studio (planned)
@@ -47,7 +47,7 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 | `design` | P5 | organizationId, workspaceId, title, prompt, sizePreset, width, height, document (JSON layers), thumbnailFileId, status |
 | `design_version` | P5 | designId, document, createdById |
 | `template` | P5 | organizationId? (null = global), category, industry, sizePreset, document |
-| `generation_job` | P4 | organizationId, type, input, output, provider, status, error |
+| `generation_job` | ✅ P4 | organizationId, userId, type, status (QUEUED/RUNNING/SUCCEEDED/FAILED), purpose, input, output (text or fileIds), errorCode/errorMessage, provider, model, credits, timestamps |
 | `copy_asset` | P6 | organizationId, kind (HEADLINE/CAPTION/…), language, tone, content, variants, campaignId? |
 | `video` | P16 | organizationId, script, storyboard, fileId, status, durationSec |
 

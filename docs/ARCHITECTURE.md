@@ -86,21 +86,35 @@ defines permission strings such as `organization:update`, `workspace:create` and
 plus a `ROLE_PERMISSIONS` map. Controllers declare `@RequirePermissions('workspace:create')`.
 Later phases can add per-org custom roles without touching controllers.
 
-## 6. AI provider abstraction (implemented in Phase 4)
+## 6. AI provider layer (implemented in Phase 4)
 
-```ts
-interface AITextProvider  { id: string; generateText(i: TextGenerationInput): Promise<TextGenerationResult> }
-interface AIImageProvider { id: string; generateImage(i: ImageGenerationInput): Promise<ImageGenerationResult> }
-interface AIVideoProvider { id: string; generateVideo(i: VideoGenerationInput): Promise<VideoGenerationResult> }
+```
+POST /ai/text ─┐                     ┌─ AnthropicTextProvider  (claude-opus-5-5, @anthropic-ai/sdk)
+POST /ai/jobs ─┼─► AIService ─► chain┼─ OpenAITextProvider     (gpt-6.1-sol, Responses API)
+               │   │                 └─ GeminiTextProvider     (gemini-3.8-flash, @google/genai)
+               │   ├─ plan credit pre-check (UsageService)
+               │   ├─ per-attempt metering → ai_usage (tokens, cost µUSD, credits, latency, errorKind)
+               │   └─ images → StorageService (private S3, signed URLs)
+               └─► BullMQ `ai-generation` → AIGenerationProcessor (TenantContext per job) → generation_job
 ```
 
-* `AIProviderRegistry` holds the registered providers by capability, the per-org and default
-  provider selection, and an ordered fallback chain.
-* Every call is metered into `AiUsage`: tokens, images, seconds of video, cost in micro-USD,
-  and the credits charged. Credits are checked against plan limits before work is enqueued.
-* API keys exist only in the API's environment and never reach the browser.
-* Candidates: OpenAI, Anthropic and Google Gemini for text; OpenAI and Google for images;
-  pluggable video vendors.
+* **Interfaces:** `AITextProvider`, `AIImageProvider` and `AIVideoProvider` in `apps/api/src/ai/ai-provider.interfaces.ts`. Video adapters ship in Phase 16.
+* **Registration:** an adapter is registered at boot only when its API key is set.
+* **Provider order:** comes from `AI_TEXT_PROVIDERS` / `AI_IMAGE_PROVIDERS`. An organization can prefer a different first provider (`organization.aiSettings`), and a single request can override it (`provider`).
+* **Fallback:**
+  * Retryable failures move on to the next provider: rate limits, outages, auth problems, refusals, empty output.
+  * A bad request (`invalid_request`) stops the chain with a 422.
+  * If every provider declines on safety grounds, the response is `AI_CONTENT_REFUSED`.
+  * The SDKs themselves retry transient errors twice before an adapter reports a failure.
+* **Anthropic:**
+  * No sampling parameters are sent, because current models reject them.
+  * Effort is set with `output_config.effort` (`ANTHROPIC_EFFORT`, default `medium`).
+  * Server-side refusal fallback is on: beta `server-side-fallback-2026-07-01` with `fallbacks: "default"`.
+  * Cost is priced by `response.model`, the model that actually served the request.
+* **Credits vs. cost:**
+  * Customers see **credits**: 1 per started 4,000 text tokens, 4 per image. They count against `Plan.limits.aiCredits` and are checked before every call.
+  * Provider **cost** is recorded in micro-USD per attempt for margin reporting and never returned to clients. Prices live in `ai-pricing.ts`, and unknown models are priced at the provider's highest rate.
+* **Security:** keys exist only in the API process. Responses never include provider error text, only a normalised code.
 
 ## 7. Payment provider abstraction (implemented in Phase 2)
 

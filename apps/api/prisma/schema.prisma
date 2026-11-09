@@ -25,13 +25,14 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions    Session[]
-  accounts    Account[]
-  members     Member[]
-  invitations Invitation[]
-  auditLogs   AuditLog[]
-  files       StoredFile[]
-  aiUsage     AiUsage[]
+  sessions       Session[]
+  accounts       Account[]
+  members        Member[]
+  invitations    Invitation[]
+  auditLogs      AuditLog[]
+  files          StoredFile[]
+  aiUsage        AiUsage[]
+  generationJobs GenerationJob[]
 
   @@map("user")
 }
@@ -99,18 +100,21 @@ model Organization {
   timezone        String   @default("Asia/Kolkata")
   defaultLanguage String   @default("en")
   currency        String   @default("INR")
+  /// { textProvider?: string, imageProvider?: string } — preferred AI providers (null = platform default order)
+  aiSettings      Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt
 
-  members      Member[]
-  invitations  Invitation[]
-  workspaces   Workspace[]
-  subscription Subscription?
-  auditLogs    AuditLog[]
-  files        StoredFile[]
-  aiUsage      AiUsage[]
-  invoices     Invoice[]
-  payments     Payment[]
+  members        Member[]
+  invitations    Invitation[]
+  workspaces     Workspace[]
+  subscription   Subscription?
+  auditLogs      AuditLog[]
+  files          StoredFile[]
+  aiUsage        AiUsage[]
+  generationJobs GenerationJob[]
+  invoices       Invoice[]
+  payments       Payment[]
 
   @@map("organization")
 }
@@ -287,10 +291,17 @@ model AiUsage {
   costMicroUsd   BigInt        @default(0)
   credits        Int           @default(0)
   status         AiUsageStatus
+  /// What the generation was for, e.g. "playground", "copywriter", "design"
+  purpose        String?
+  jobId          String?
+  /// Normalised failure kind for FAILED attempts (rate_limited, refused, unavailable, …)
+  errorKind      String?
+  latencyMs      Int?
   createdAt      DateTime      @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  job          GenerationJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
   @@map("ai_usage")
@@ -388,4 +399,41 @@ model BillingEvent {
   @@unique([provider, eventId])
   @@index([organizationId])
   @@map("billing_event")
+}
+
+// ───────────────────────────── AI generation jobs ─────────────────────────────
+
+enum GenerationStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// Asynchronous AI work (images now; long text, video later). Processed by the `ai-generation` BullMQ queue.
+model GenerationJob {
+  id             String           @id @default(uuid(7))
+  organizationId String
+  userId         String?
+  type           AICapability
+  status         GenerationStatus @default(QUEUED)
+  purpose        String
+  input          Json
+  /// TEXT: { text }, IMAGE: { fileIds: string[] }
+  output         Json?
+  errorCode      String?
+  errorMessage   String?
+  provider       String?
+  model          String?
+  credits        Int              @default(0)
+  createdAt      DateTime         @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  usage        AiUsage[]
+
+  @@index([organizationId, createdAt])
+  @@map("generation_job")
 }
