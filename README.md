@@ -10,7 +10,7 @@ overview, architecture, roadmap and current [implementation status](./docs/IMPLE
 Prerequisites: Node.js 22.12+, pnpm 10, PostgreSQL 16, Redis 7. You can run them with Docker:
 
 ```bash
-docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis minio minio-init
+docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis s3 s3-init
 ```
 
 Then:

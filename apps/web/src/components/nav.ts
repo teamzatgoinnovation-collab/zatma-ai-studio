@@ -29,7 +29,7 @@ export const NAV: NavItem[] = [
   { label: 'Advertising', href: '/ads', icon: Target, phase: 11 },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, phase: 17 },
   { label: 'AI Assistant', href: '/assistant', icon: Bot, phase: 6 },
-  { label: 'Team', href: '/team', icon: Building2, phase: 2 },
-  { label: 'Billing', href: '/billing', icon: CreditCard, phase: 2 },
-  { label: 'Settings', href: '/settings', icon: Settings, phase: 3 },
+  { label: 'Team', href: '/team', icon: Building2 },
+  { label: 'Billing', href: '/billing', icon: CreditCard },
+  { label: 'Settings', href: '/settings', icon: Settings },
 ];

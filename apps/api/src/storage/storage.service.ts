@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import type { PresignedUpload } from '@zatma/types';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import type { PresignedUpload, StoredFileSummary } from '@zatma/types';
 import type { PresignUploadInput } from '@zatma/validation';
-import { ENV } from '../config/config.module.js';
-import type { Env } from '../config/env.js';
+import { AppException, notFound } from '../common/errors.js';
 import { TenantContext } from '../common/tenant-context.js';
+import type { StoredFile } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { UsageService } from '../billing/usage.service.js';
+import { OBJECT_STORAGE, type ObjectStorage } from './object-storage.js';
 
 const EXTENSIONS: Record<string, string> = {
   'image/png': 'png',
@@ -20,30 +20,28 @@ const EXTENSIONS: Record<string, string> = {
 };
 
 const UPLOAD_URL_TTL_SECONDS = 600;
-const DOWNLOAD_URL_TTL_SECONDS = 300;
+export const DOWNLOAD_URL_TTL_SECONDS = 300;
+
+const toSummary = (f: StoredFile): StoredFileSummary => ({
+  id: f.id,
+  fileName: f.fileName,
+  mimeType: f.mimeType,
+  sizeBytes: f.sizeBytes,
+  purpose: f.purpose,
+  status: f.status,
+});
 
 /**
- * S3-compatible object storage (MinIO in development, Cloudflare R2 in production).
- * Objects are private; access is always via short-lived presigned URLs.
+ * Private object storage with presigned URLs.
  * Keys are namespaced by organization: org/<organizationId>/<purpose>/<uuid>.<ext>
  */
 @Injectable()
 export class StorageService {
-  private readonly s3: S3Client;
-  private readonly bucket: string;
-
   constructor(
-    @Inject(ENV) env: Env,
+    @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
     private readonly prisma: PrismaService,
-  ) {
-    this.bucket = env.S3_BUCKET;
-    this.s3 = new S3Client({
-      region: env.S3_REGION,
-      endpoint: env.S3_ENDPOINT,
-      forcePathStyle: env.S3_FORCE_PATH_STYLE,
-      credentials: { accessKeyId: env.S3_ACCESS_KEY_ID, secretAccessKey: env.S3_SECRET_ACCESS_KEY },
-    });
-  }
+    private readonly usage: UsageService,
+  ) {}
 
   static buildKey(organizationId: string, purpose: string, mimeType: string, id: string = randomUUID()): string {
     return `org/${organizationId}/${purpose.toLowerCase()}/${id}.${EXTENSIONS[mimeType] ?? 'bin'}`;
@@ -51,35 +49,52 @@ export class StorageService {
 
   async createUpload(input: PresignUploadInput): Promise<PresignedUpload> {
     const organizationId = TenantContext.requireOrganizationId();
+    await this.usage.assertWithinLimit(organizationId, 'storageMb', Math.ceil(input.sizeBytes / (1024 * 1024)));
     const key = StorageService.buildKey(organizationId, input.purpose, input.mimeType);
     const file = await this.prisma.tenant.storedFile.create({
       data: {
         organizationId,
         uploadedById: TenantContext.get()?.userId ?? null,
         key,
-        bucket: this.bucket,
+        bucket: this.storage.bucket,
         fileName: input.fileName,
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
         purpose: input.purpose,
       },
     });
-    const uploadUrl = await getSignedUrl(
-      this.s3,
-      new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: input.mimeType, ContentLength: input.sizeBytes }),
-      { expiresIn: UPLOAD_URL_TTL_SECONDS },
-    );
-    return {
-      fileId: file.id,
-      key,
-      uploadUrl,
-      method: 'PUT',
-      headers: { 'Content-Type': input.mimeType },
-      expiresInSeconds: UPLOAD_URL_TTL_SECONDS,
-    };
+    const uploadUrl = await this.storage.presignPut(key, input.mimeType, input.sizeBytes, UPLOAD_URL_TTL_SECONDS);
+    return { fileId: file.id, key, uploadUrl, method: 'PUT', headers: { 'Content-Type': input.mimeType }, expiresInSeconds: UPLOAD_URL_TTL_SECONDS };
   }
 
-  async createDownloadUrl(key: string): Promise<string> {
-    return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn: DOWNLOAD_URL_TTL_SECONDS });
+  /** Confirms the browser upload landed and matches what was declared. */
+  async completeUpload(id: string): Promise<StoredFileSummary> {
+    const file = await this.prisma.tenant.storedFile.findFirst({ where: { id } });
+    if (!file) throw notFound('File');
+    if (file.status === 'UPLOADED') return toSummary(file);
+    const head = await this.storage.head(file.key);
+    if (!head) throw new AppException(HttpStatus.CONFLICT, 'UPLOAD_MISSING', 'The file has not been uploaded yet');
+    if (head.sizeBytes !== file.sizeBytes || (head.contentType && head.contentType !== file.mimeType)) {
+      throw new AppException(HttpStatus.UNPROCESSABLE_ENTITY, 'UPLOAD_MISMATCH', 'The uploaded file does not match the declared size or type');
+    }
+    const updated = await this.prisma.tenant.storedFile.update({ where: { id }, data: { status: 'UPLOADED' } });
+    return toSummary(updated);
+  }
+
+  /** Loads an uploaded file of the active organization (404 for other tenants). */
+  async getUploaded(id: string): Promise<StoredFile> {
+    const file = await this.prisma.tenant.storedFile.findFirst({ where: { id, status: 'UPLOADED' } });
+    if (!file) throw notFound('File');
+    return file;
+  }
+
+  async downloadUrl(id: string): Promise<{ url: string; expiresInSeconds: number }> {
+    const file = await this.getUploaded(id);
+    return { url: await this.storage.presignGet(file.key, DOWNLOAD_URL_TTL_SECONDS), expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS };
+  }
+
+  /** Signed URL for a file by id without a tenant context (e.g. org logo for its own members). */
+  async signedUrlForKey(key: string): Promise<string> {
+    return this.storage.presignGet(key, DOWNLOAD_URL_TTL_SECONDS);
   }
 }

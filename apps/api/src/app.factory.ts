@@ -13,7 +13,7 @@ import type { Auth } from './auth/auth.js';
 import { ENV } from './config/config.module.js';
 import type { Env } from './config/env.js';
 
-/** Builds the fully configured Nest application (shared by main.ts and e2e tests). */
+/** Builds the fully configured Nest application (used by main.ts). */
 export async function createApp(options: { logger?: boolean } = {}): Promise<NestExpressApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Better Auth must read the raw request stream, so body parsing is registered manually below.
@@ -22,7 +22,15 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Nes
     ...(options.logger === false ? { logger: false } : {}),
   });
   if (options.logger !== false) app.useLogger(app.get(Logger));
+  return configureApp(app);
+}
 
+/**
+ * Applies middleware, auth handler, prefixes and Swagger. Shared by createApp and the e2e test
+ * harness (which builds the app from a TestingModule so providers can be overridden).
+ * The app must have been created with `bodyParser: false`.
+ */
+export function configureApp(app: NestExpressApplication): NestExpressApplication {
   const env = app.get<Env>(ENV);
   const auth = app.get<Auth>(AUTH);
 
@@ -40,7 +48,15 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Nes
   // Registered as a route (not a mounted sub-app) so Better Auth sees the full, unmodified path.
   (app.getHttpAdapter().getInstance() as express.Express).all('/api/auth/{*path}', toNodeHandler(auth));
 
-  app.use(express.json({ limit: '1mb' }));
+  app.use(
+    express.json({
+      limit: '1mb',
+      // Payment webhooks are signed over the exact bytes received.
+      verify: (req, _res, buf) => {
+        if ((req as express.Request).originalUrl?.startsWith('/api/v1/billing/webhooks/')) (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
   app.setGlobalPrefix('api');

@@ -31,10 +31,11 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 
 | Table | Status | Key fields |
 |---|---|---|
-| `plan` | ✅ P1 (seeded) | code (FREE/STARTER/PROFESSIONAL/BUSINESS/AGENCY), name, priceMonthly, priceYearly, currency, limits (JSON: aiCredits, storageMb, members, socialAccounts, workspaces) |
-| `subscription` | ✅ P1 (shell) | organizationId (unique), planId, status, interval, provider, externalId, currentPeriodStart/End, trialEndsAt, cancelAtPeriodEnd |
-| `invoice` | 🕓 P2 | organizationId, subscriptionId, number, amount, currency, status, externalId, pdfUrl |
-| `payment` | 🕓 P2 | organizationId, invoiceId, amount, status, provider, externalId |
+| `plan` | ✅ P1 (seeded), P2 | code (FREE/STARTER/PROFESSIONAL/BUSINESS/AGENCY), name, priceMonthly, priceYearly, currency, limits (JSON: aiCredits, storageMb, members, socialAccounts, workspaces), razorpayPlanIdMonthly/Yearly |
+| `subscription` | ✅ P2 | organizationId (unique), planId, status, interval, provider, externalId, providerCustomerId, currentPeriodStart/End, trialEndsAt, trialReminderSentAt, cancelAtPeriodEnd, pendingPlanId/pendingInterval (scheduled downgrade), graceUntil |
+| `invoice` | ✅ P2 | organizationId, subscriptionId, provider, externalId (unique), number, amount, currency, status, periodStart/End, invoiceUrl, issuedAt |
+| `payment` | ✅ P2 | organizationId, invoiceId, provider, externalId (unique), amount, currency, status, method, errorReason |
+| `billing_event` | ✅ P2 | provider + eventId (unique, idempotency), type, organizationId, payload, processedAt, error. Platform-level |
 | `ai_usage` | ✅ P1 | organizationId, userId?, capability (TEXT/IMAGE/VIDEO/EMBEDDING), provider, model, inputTokens, outputTokens, units, costMicroUsd, credits, status |
 | `stored_file` | ✅ P1 | organizationId, uploadedById, key (unique), bucket, mimeType, sizeBytes, purpose, status |
 

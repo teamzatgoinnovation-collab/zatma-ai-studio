@@ -36,4 +36,16 @@ export class UsersService {
     await this.prisma.system.user.update({ where: { id: userId }, data: input });
     return this.getCurrent(userId, activeOrganizationId);
   }
+
+  /** Sole owners of organizations that have other members must transfer ownership first. */
+  async deletionEligibility(userId: string): Promise<{ canDelete: boolean; blockingOrganizations: Array<{ id: string; name: string }> }> {
+    const owned = await this.prisma.system.member.findMany({
+      where: { userId, role: 'organization_owner' },
+      include: { organization: { include: { members: { select: { userId: true, role: true } } } } },
+    });
+    const blocking = owned
+      .filter(({ organization: o }) => o.members.some((m) => m.userId !== userId) && !o.members.some((m) => m.userId !== userId && m.role === 'organization_owner'))
+      .map(({ organization: o }) => ({ id: o.id, name: o.name }));
+    return { canDelete: blocking.length === 0, blockingOrganizations: blocking };
+  }
 }

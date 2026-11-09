@@ -20,6 +20,8 @@ describe('validation schemas', () => {
     expect(updateOrganizationSchema.safeParse({ timezone: 'Mars/Base' }).success).toBe(false);
     const parsed = updateOrganizationSchema.parse({ timezone: 'Asia/Kolkata', website: '' });
     expect(parsed.website).toBeNull();
+    // Output of a parse must be valid input again (web form → API).
+    expect(updateOrganizationSchema.parse(parsed)).toEqual(parsed);
   });
 
   it('applies pagination defaults and caps', () => {

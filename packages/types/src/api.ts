@@ -79,6 +79,8 @@ export interface CurrentOrganization {
   createdAt: string;
   role: OrgRole;
   permissions: Permission[];
+  /** Signed URL for the organization logo (short-lived), if one is set. */
+  logoUrl: string | null;
   subscription: { status: string; plan: PlanSummary } | null;
 }
 
@@ -131,4 +133,84 @@ export interface AIProviderInfo {
   configured: boolean;
   /** Adapter implemented and registered (Phase 4). */
   implemented: boolean;
+}
+
+export type UsageMetric = keyof PlanLimits;
+
+export interface UsageSummary {
+  metrics: Array<{ metric: UsageMetric; used: number; limit: number }>;
+}
+
+export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'EXPIRED';
+export type BillingInterval = 'MONTHLY' | 'YEARLY';
+
+export interface SubscriptionDetail {
+  status: SubscriptionStatus;
+  interval: BillingInterval;
+  plan: PlanSummary;
+  /** Plan whose limits currently apply (FREE when canceled/expired). */
+  effectivePlan: PlanSummary;
+  pendingPlan: PlanSummary | null;
+  provider: string | null;
+  currentPeriodStart: string;
+  currentPeriodEnd: string | null;
+  trialEndsAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  graceUntil: string | null;
+  billingEnabled: boolean;
+}
+
+export interface CheckoutSession {
+  provider: 'razorpay';
+  keyId: string;
+  subscriptionId: string;
+  plan: PlanSummary;
+  interval: BillingInterval;
+  prefill: { name: string; email: string };
+}
+
+export interface InvoiceSummary {
+  id: string;
+  number: string | null;
+  amount: string;
+  currency: string;
+  status: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  invoiceUrl: string | null;
+  issuedAt: string;
+}
+
+export interface InvitationSummary {
+  id: string;
+  email: string;
+  role: OrgRole | null;
+  status: string;
+  expiresAt: string;
+  inviterName: string | null;
+}
+
+export interface PublicInvitation {
+  id: string;
+  email: string;
+  role: OrgRole | null;
+  status: string;
+  expiresAt: string;
+  organizationName: string;
+  inviterName: string | null;
+}
+
+export interface AuthProviders {
+  emailPassword: true;
+  google: boolean;
+  requireEmailVerification: boolean;
+}
+
+export interface StoredFileSummary {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  purpose: string;
+  status: string;
 }

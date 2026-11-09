@@ -2,7 +2,7 @@ import type { Server } from 'node:http';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp } from '../src/app.factory.js';
+import { createTestApp } from './harness.js';
 import { api, createOrg, signUp, type TestUser } from './helpers.js';
 
 describe('Foundation (e2e)', () => {
@@ -10,8 +10,7 @@ describe('Foundation (e2e)', () => {
   let owner: TestUser;
 
   beforeAll(async () => {
-    app = await createApp({ logger: false });
-    await app.init();
+    app = await createTestApp();
     owner = await signUp(app, 'Owner');
   });
 
@@ -47,11 +46,11 @@ describe('Foundation (e2e)', () => {
     expect(res.body.code).toBe('NO_ACTIVE_ORGANIZATION');
   });
 
-  it('provisions a new organization with default workspace, Free plan and audit entry', async () => {
+  it('provisions a new organization with default workspace, Professional trial and audit entry', async () => {
     const orgId = await createOrg(app, owner, 'ZatGo Innovation');
 
     const org = await api(app, owner).get('/organizations/current').expect(200);
-    expect(org.body).toMatchObject({ id: orgId, role: 'ORGANIZATION_OWNER', currency: 'INR', subscription: { status: 'ACTIVE', plan: { code: 'FREE' } } });
+    expect(org.body).toMatchObject({ id: orgId, role: 'ORGANIZATION_OWNER', currency: 'INR', subscription: { status: 'TRIALING', plan: { code: 'PROFESSIONAL' } } });
 
     const ws = await api(app, owner).get('/workspaces').expect(200);
     expect(ws.body.meta.total).toBe(1);

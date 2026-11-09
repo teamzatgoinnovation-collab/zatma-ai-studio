@@ -69,3 +69,36 @@ stricter limits from Better Auth. A request over the limit gets `429` with `code
 | GET | `/api/v1/billing/plans` | public | Plan catalogue |
 | GET | `/api/v1/billing/subscription` | `billing:read` | Active org subscription |
 | GET | `/api/v1/ai/providers` | `ai:read` | Registered AI providers & configuration status |
+
+## Phase 2 endpoints
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/api/v1/auth/providers` | public | Enabled sign-in methods (email, Google) and whether verification is required |
+| GET | `/api/v1/users/me/deletion-eligibility` | session | Whether the account can be deleted (sole-owner check) |
+| GET | `/api/v1/organizations/current/invitations` | `member:read` | Pending invitations |
+| GET | `/api/v1/organizations/invitations/:id` | public | Minimal invitation details for the accept page |
+| PUT | `/api/v1/organizations/current/logo` | `organization:update` | Set the logo to an uploaded `LOGO` image |
+| DELETE | `/api/v1/organizations/current/logo` | `organization:update` | Remove the logo |
+| POST | `/api/v1/storage/uploads/:id/complete` | `file:upload` | Confirm a presigned upload (verifies size and type) |
+| GET | `/api/v1/files/:id/url` | `file:read` | 5-minute signed download URL |
+| GET | `/api/v1/billing/subscription` | `billing:read` | Status, period, trial, pending change, `billingEnabled` |
+| GET | `/api/v1/billing/usage` | `billing:read` | Usage against plan limits |
+| GET | `/api/v1/billing/invoices` | `billing:read` | Invoices (paginated) |
+| POST | `/api/v1/billing/checkout` | `billing:manage` | Start a Razorpay subscription and return Checkout parameters |
+| POST | `/api/v1/billing/change-plan` | `billing:manage` | Upgrades apply immediately; downgrades apply at period end (blocked with `409 PLAN_LIMIT_EXCEEDED` if usage is over the target plan's limits) |
+| POST | `/api/v1/billing/cancel` | `billing:manage` | Cancel at period end, or end a trial immediately |
+| POST | `/api/v1/billing/webhooks/razorpay` | signature | Razorpay webhook receiver |
+| GET | `/api/v1/dev/emails?to=` | dev only | Captured emails (not registered in production) |
+
+**Better Auth endpoints used by the web app** (under `/api/auth`):
+* Account: `send-verification-email`, `verify-email`, `request-password-reset`, `reset-password`, `change-password`, `list-sessions`, `revoke-session`, `delete-user` (+ `/callback`), `sign-in/social`.
+* Organizations: `organization/invite-member`, `accept-invitation`, `reject-invitation`, `cancel-invitation`, `update-member-role`, `remove-member`, `delete`, `set-active`, `list`.
+
+New error codes:
+* `PLAN_LIMIT_REACHED` (402)
+* `PLAN_LIMIT_EXCEEDED`, `CHECKOUT_REQUIRED`, `SUBSCRIPTION_EXISTS`, `NOTHING_TO_CANCEL` (409)
+* `BILLING_NOT_CONFIGURED`, `PLAN_NOT_CONFIGURED` (503)
+* `INVALID_SIGNATURE` (400)
+* `UPLOAD_MISSING` (409), `UPLOAD_MISMATCH` (422), `INVALID_LOGO` (422)
+* `SOLE_OWNER`, `ACTIVE_SUBSCRIPTION`, `EMAIL_NOT_VERIFIED` (from Better Auth)

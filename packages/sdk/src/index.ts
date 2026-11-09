@@ -1,5 +1,13 @@
 import type {
   AIProviderInfo,
+  AuthProviders,
+  CheckoutSession,
+  InvitationSummary,
+  InvoiceSummary,
+  PublicInvitation,
+  StoredFileSummary,
+  SubscriptionDetail,
+  UsageSummary,
   ApiErrorBody,
   AuditLogEntry,
   CurrentOrganization,
@@ -12,6 +20,8 @@ import type {
   Workspace,
 } from '@zatma/types';
 import type {
+  ChangePlanInput,
+  CheckoutInput,
   CreateWorkspaceInput,
   PresignUploadInput,
   UpdateOrganizationInput,
@@ -74,14 +84,23 @@ export function createApiClient(options: ApiClientOptions) {
 
   return {
     health: () => request<HealthStatus>('GET', '/health'),
+    auth: {
+      providers: () => request<AuthProviders>('GET', '/auth/providers'),
+    },
     users: {
       me: () => request<CurrentUser>('GET', '/users/me'),
       updateMe: (input: UpdateProfileInput) => request<CurrentUser>('PATCH', '/users/me', input),
+      deletionEligibility: () =>
+        request<{ canDelete: boolean; blockingOrganizations: Array<{ id: string; name: string }> }>('GET', '/users/me/deletion-eligibility'),
     },
     organizations: {
       current: () => request<CurrentOrganization>('GET', '/organizations/current'),
       update: (input: UpdateOrganizationInput) => request<CurrentOrganization>('PATCH', '/organizations/current', input),
       members: () => request<OrganizationMember[]>('GET', '/organizations/current/members'),
+      invitations: () => request<InvitationSummary[]>('GET', '/organizations/current/invitations'),
+      publicInvitation: (id: string) => request<PublicInvitation>('GET', `/organizations/invitations/${encodeURIComponent(id)}`),
+      setLogo: (fileId: string) => request<CurrentOrganization>('PUT', '/organizations/current/logo', { fileId }),
+      removeLogo: () => request<CurrentOrganization>('DELETE', '/organizations/current/logo'),
     },
     workspaces: {
       list: (query?: { page?: number; pageSize?: number }) => request<Paginated<Workspace>>('GET', '/workspaces', undefined, query),
@@ -95,10 +114,17 @@ export function createApiClient(options: ApiClientOptions) {
     },
     storage: {
       presignUpload: (input: PresignUploadInput) => request<PresignedUpload>('POST', '/storage/uploads', input),
+      completeUpload: (fileId: string) => request<StoredFileSummary>('POST', `/storage/uploads/${encodeURIComponent(fileId)}/complete`),
+      fileUrl: (fileId: string) => request<{ url: string; expiresInSeconds: number }>('GET', `/files/${encodeURIComponent(fileId)}/url`),
     },
     billing: {
       plans: () => request<PlanSummary[]>('GET', '/billing/plans'),
-      subscription: () => request<CurrentOrganization['subscription']>('GET', '/billing/subscription'),
+      subscription: () => request<SubscriptionDetail | null>('GET', '/billing/subscription'),
+      usage: () => request<UsageSummary>('GET', '/billing/usage'),
+      invoices: (query?: { page?: number; pageSize?: number }) => request<Paginated<InvoiceSummary>>('GET', '/billing/invoices', undefined, query),
+      checkout: (input: CheckoutInput) => request<CheckoutSession>('POST', '/billing/checkout', input),
+      changePlan: (input: ChangePlanInput) => request<SubscriptionDetail | null>('POST', '/billing/change-plan', input),
+      cancel: () => request<SubscriptionDetail | null>('POST', '/billing/cancel'),
     },
     ai: {
       providers: () => request<AIProviderInfo[]>('GET', '/ai/providers'),

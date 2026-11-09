@@ -109,6 +109,8 @@ model Organization {
   auditLogs    AuditLog[]
   files        StoredFile[]
   aiUsage      AiUsage[]
+  invoices     Invoice[]
+  payments     Payment[]
 
   @@map("organization")
 }
@@ -206,43 +208,57 @@ enum BillingInterval {
 }
 
 model Plan {
-  id           String   @id @default(uuid(7))
-  code         PlanCode @unique
-  name         String
-  description  String?
-  priceMonthly Decimal? @db.Decimal(14, 2)
-  priceYearly  Decimal? @db.Decimal(14, 2)
-  currency     String   @default("INR")
+  id                    String   @id @default(uuid(7))
+  code                  PlanCode @unique
+  name                  String
+  description           String?
+  priceMonthly          Decimal? @db.Decimal(14, 2)
+  priceYearly           Decimal? @db.Decimal(14, 2)
+  currency              String   @default("INR")
   /// { aiCredits, storageMb, members, socialAccounts, workspaces }. -1 = unlimited
-  limits       Json
-  isPublic     Boolean  @default(true)
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  limits                Json
+  isPublic              Boolean  @default(true)
+  sortOrder             Int      @default(0)
+  /// Razorpay plan ids (created in the Razorpay dashboard), per billing interval
+  razorpayPlanIdMonthly String?
+  razorpayPlanIdYearly  String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  subscriptions Subscription[]
+  subscriptions        Subscription[] @relation("SubscriptionPlan")
+  pendingSubscriptions Subscription[] @relation("SubscriptionPendingPlan")
 
   @@map("plan")
 }
 
 model Subscription {
-  id                 String             @id @default(uuid(7))
-  organizationId     String             @unique
-  planId             String
-  status             SubscriptionStatus @default(ACTIVE)
-  interval           BillingInterval    @default(MONTHLY)
-  provider           String?
-  externalId         String?            @unique
-  currentPeriodStart DateTime           @default(now())
-  currentPeriodEnd   DateTime?
-  trialEndsAt        DateTime?
-  cancelAtPeriodEnd  Boolean            @default(false)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  id                  String             @id @default(uuid(7))
+  organizationId      String             @unique
+  planId              String
+  status              SubscriptionStatus @default(ACTIVE)
+  interval            BillingInterval    @default(MONTHLY)
+  provider            String?
+  externalId          String?            @unique
+  currentPeriodStart  DateTime           @default(now())
+  currentPeriodEnd    DateTime?
+  trialEndsAt         DateTime?
+  cancelAtPeriodEnd   Boolean            @default(false)
+  /// Plan (and interval) the subscription switches to at the end of the current period (scheduled downgrade)
+  pendingPlanId       String?
+  pendingInterval     BillingInterval?
+  /// PAST_DUE subscriptions keep access until this date
+  graceUntil          DateTime?
+  providerCustomerId  String?
+  trialReminderSentAt DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plan         Plan         @relation(fields: [planId], references: [id])
+  plan         Plan         @relation("SubscriptionPlan", fields: [planId], references: [id])
+  pendingPlan  Plan?        @relation("SubscriptionPendingPlan", fields: [pendingPlanId], references: [id])
+  invoices     Invoice[]
 
+  @@index([status])
   @@map("subscription")
 }
 
@@ -307,4 +323,69 @@ model StoredFile {
 
   @@index([organizationId])
   @@map("stored_file")
+}
+
+// ───────────────────────────── Invoices, payments & webhook log ─────────────────────────────
+
+model Invoice {
+  id             String    @id @default(uuid(7))
+  organizationId String
+  subscriptionId String?
+  provider       String
+  externalId     String    @unique
+  number         String?
+  amount         Decimal   @db.Decimal(14, 2)
+  currency       String
+  status         String
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  invoiceUrl     String?
+  issuedAt       DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  payments     Payment[]
+
+  @@index([organizationId, issuedAt])
+  @@map("invoice")
+}
+
+model Payment {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  invoiceId      String?
+  provider       String
+  externalId     String   @unique
+  amount         Decimal  @db.Decimal(14, 2)
+  currency       String
+  status         String
+  method         String?
+  errorReason    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoice      Invoice?     @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("payment")
+}
+
+/// Every verified payment-provider webhook, for idempotency and auditing. Platform-level (not tenant scoped).
+model BillingEvent {
+  id             String    @id @default(uuid(7))
+  provider       String
+  eventId        String
+  type           String
+  organizationId String?
+  payload        Json
+  processedAt    DateTime?
+  error          String?
+  createdAt      DateTime  @default(now())
+
+  @@unique([provider, eventId])
+  @@index([organizationId])
+  @@map("billing_event")
 }

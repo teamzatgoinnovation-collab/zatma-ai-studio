@@ -12,6 +12,8 @@ import { AuthGuard } from './common/guards/auth.guard.js';
 import { requestContextMiddleware } from './common/request-context.middleware.js';
 import { ConfigModule, ENV } from './config/config.module.js';
 import { loadEnv, type Env } from './config/env.js';
+import { DevModule } from './dev/dev.module.js';
+import { EmailModule } from './email/email.module.js';
 import { HealthModule } from './health/health.module.js';
 import { NotificationModule } from './notifications/notification.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
@@ -50,6 +52,7 @@ const bootEnv = loadEnv();
     PrismaModule,
     RedisModule,
     NotificationModule,
+    EmailModule,
     AuthModule,
     AuditModule,
     HealthModule,
@@ -59,6 +62,7 @@ const bootEnv = loadEnv();
     StorageModule,
     AIProviderModule,
     BillingModule,
+    ...(bootEnv.NODE_ENV === 'production' ? [] : [DevModule]),
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

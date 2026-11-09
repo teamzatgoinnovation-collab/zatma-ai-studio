@@ -1,8 +1,6 @@
-import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { getServerSession } from '@/lib/server-session';
 
 const PILLARS = [
   { title: 'AI Create', text: 'Posters, ads, copy and video from a single prompt, in Malayalam, English, Arabic and more.' },
@@ -10,9 +8,7 @@ const PILLARS = [
   { title: 'CRM & Analyze', text: 'Capture leads, move deals through your pipeline, and see what really works.' },
 ];
 
-export default async function AuthLayout({ children }: { children: ReactNode }) {
-  if (await getServerSession()) redirect('/dashboard');
-
+export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
       <aside className="relative hidden overflow-hidden bg-gradient-to-br from-indigo-700 via-violet-700 to-cyan-600 p-10 text-white lg:flex lg:flex-col lg:justify-between">

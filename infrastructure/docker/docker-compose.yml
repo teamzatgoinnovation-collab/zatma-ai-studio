@@ -1,5 +1,5 @@
 # Local development infrastructure + optional full stack.
-#   Infra only:   docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis minio minio-init
+#   Infra only:   docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis s3 s3-init
 #   Full stack:   docker compose -f infrastructure/docker/docker-compose.yml --profile app up --build
 name: zatma
 
@@ -29,21 +29,25 @@ services:
       interval: 5s
       retries: 10
 
-  minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    command: server /data --console-address ":9001"
+  # Local S3 emulator (the open-source MinIO server is archived). Production uses Cloudflare R2.
+  s3:
+    image: motoserver/moto:5.2.5
+    ports: ["9000:9000"]
     environment:
-      MINIO_ROOT_USER: zatma
-      MINIO_ROOT_PASSWORD: zatma-secret
-    ports: ["9000:9000", "9001:9001"]
-    volumes: [minio-data:/data]
+      MOTO_PORT: "9000"
 
-  minio-init:
-    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
-    depends_on: [minio]
+  s3-init:
+    image: amazon/aws-cli:2.27.0
+    depends_on: [s3]
+    environment:
+      AWS_ACCESS_KEY_ID: zatma
+      AWS_SECRET_ACCESS_KEY: zatma-secret
+      AWS_DEFAULT_REGION: us-east-1
     entrypoint: >
-      /bin/sh -c "until mc alias set local http://minio:9000 zatma zatma-secret; do sleep 1; done;
-      mc mb --ignore-existing local/zatma-assets; mc anonymous set none local/zatma-assets"
+      /bin/sh -c "until aws --endpoint-url http://s3:9000 s3api list-buckets >/dev/null 2>&1; do sleep 1; done;
+      aws --endpoint-url http://s3:9000 s3api create-bucket --bucket zatma-assets || true;
+      aws --endpoint-url http://s3:9000 s3api put-bucket-cors --bucket zatma-assets --cors-configuration
+      '{\"CORSRules\":[{\"AllowedOrigins\":[\"http://localhost:3000\"],\"AllowedMethods\":[\"PUT\",\"GET\"],\"AllowedHeaders\":[\"*\"]}]}'"
 
   api:
     profiles: [app]
@@ -52,7 +56,7 @@ services:
     environment:
       DATABASE_URL: postgresql://zatma:zatma@postgres:5432/zatma
       REDIS_URL: redis://redis:6379
-      S3_ENDPOINT: http://minio:9000
+      S3_ENDPOINT: http://s3:9000
     ports: ["4000:4000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -69,4 +73,3 @@ services:
 volumes:
   postgres-data:
   redis-data:
-  minio-data:
