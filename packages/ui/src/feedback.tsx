@@ -7,8 +7,8 @@ export const badgeVariants = cva('inline-flex items-center rounded-full px-2.5 p
     tone: {
       neutral: 'bg-muted text-muted-foreground',
       primary: 'bg-primary/10 text-primary',
-      success: 'bg-success/15 text-success',
-      warning: 'bg-warning/15 text-warning',
+      success: 'bg-success/15 text-success-text',
+      warning: 'bg-warning/15 text-warning-text',
       danger: 'bg-destructive/15 text-destructive',
     },
   },

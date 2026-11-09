@@ -189,6 +189,8 @@ export function OrganizationSettings() {
                   accept={LOGO_TYPES.join(',')}
                   className="sr-only"
                   id="logo-file"
+                  aria-label="Upload logo"
+                  tabIndex={-1}
                   onChange={(e) => void onLogo(e.target.files?.[0])}
                 />
                 <Button className="flex-1" variant="outline" disabled={uploading} onClick={() => fileInput.current?.click()}>

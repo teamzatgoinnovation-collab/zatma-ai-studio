@@ -2,10 +2,10 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MailPlus, RotateCw, Trash2, UserMinus } from 'lucide-react';
+import { Loader2, MailPlus, RotateCw, Trash2, UserMinus, Users } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, FieldError, Input, Label, Meter, Select, Skeleton } from '@zatma/ui';
+import { Badge, Button, ErrorState, PageHeader, Card, CardContent, CardDescription, CardHeader, CardTitle, FieldError, Input, Label, Meter, Select, Skeleton } from '@zatma/ui';
 import { ROLE_LABELS, toAuthRole, type OrgRole } from '@zatma/types';
 import { ASSIGNABLE_ROLES, inviteMemberSchema, type InviteMemberInput } from '@zatma/validation';
 import { api } from '@/lib/api';
@@ -96,10 +96,7 @@ export function TeamPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
-        <p className="text-sm text-muted-foreground">Invite teammates and control what each role can do.</p>
-      </div>
+      <PageHeader icon={<Users />} title="Team" description="Invite teammates and control what each role can do." />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
@@ -109,6 +106,7 @@ export function TeamPage() {
           </CardHeader>
           <CardContent>
             {members.isPending && <Skeleton className="h-32" />}
+            {members.isError && <ErrorState description="Couldn't load members." onRetry={() => void members.refetch()} />}
             <ul className="divide-y divide-border">
               {members.data?.map((m) => {
                 const editable = perms.has('member:update') && m.userId !== me && (isOwner || m.role !== 'ORGANIZATION_OWNER');
