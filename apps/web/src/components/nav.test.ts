@@ -16,7 +16,7 @@ describe('navigation config', () => {
   });
 
   it('marks live modules without a phase and planned ones with one', () => {
-    const live = ['/dashboard', '/studio', '/studio/design', '/studio/posters', '/studio/templates', '/studio/brand-kit', '/team', '/billing', '/settings'];
+    const live = ['/dashboard', '/studio', '/studio/design', '/studio/posters', '/studio/templates', '/studio/brand-kit', '/studio/copywriter', '/team', '/billing', '/settings'];
     for (const href of live) expect(findNavEntry(href), href).toBeTruthy();
     for (const e of allNavEntries().filter((e) => live.includes(e.href))) expect(e.phase, e.href).toBeUndefined();
     for (const e of allNavEntries().filter((e) => !live.includes(e.href))) {

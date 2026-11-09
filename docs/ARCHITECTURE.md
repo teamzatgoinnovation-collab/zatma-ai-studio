@@ -158,6 +158,17 @@ Editing is client-side (a pure reducer with undo/redo history). Saves are `PATCH
 last-seen `revision` (optimistic concurrency). Images are always referenced by stored-file id;
 the API resolves them to short-lived signed URLs, which the canvas loads with CORS so export is not tainted.
 
+## 8a. AI Copywriter (implemented in Phase 6)
+
+`CopyService.runJson()` is the shared path for structured text calls. It builds the prompt, calls `AIService.generateTextFor` (fallback, credits, metering), validates the reply with Zod and retries once with the parse error, then fails with `AI_OUTPUT_INVALID`. Generation, translation, rewriting and design translation all use it.
+
+Safeguards:
+* **Facts:** the system prompts allow only facts from the request and the brand kit; prices, dates and contact details are never invented.
+* **Native writing:** each language has its own guidance (native script, Kerala Malayalam, GCC Arabic).
+* **Translation check:** `missingTokens()` compares the numbers, phone numbers and URLs in the source and each translation (with Arabic-Indic digits normalised) and surfaces any difference as a warning instead of failing.
+* **Limits:** `checkLimits()` counts user-perceived characters (`Intl.Segmenter`) against each platform's limits and SMS segments, so the UI can flag copy that would be truncated or rejected.
+* **Design translation:** layout is kept. Each text layer gets a font that can render the target script (`fontForLanguage`), the right direction and alignment, and a size that fits its box (`fitFontSize` from the composer).
+
 ## 9. Tooling versions
 
 Exact versions are pinned in each `package.json` and the `pnpm-lock.yaml`. Major versions

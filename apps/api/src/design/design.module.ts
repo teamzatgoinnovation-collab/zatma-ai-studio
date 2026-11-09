@@ -9,5 +9,6 @@ import { DESIGN_QUEUE, DesignService } from './design.service.js';
   imports: [BullModule.registerQueue({ name: DESIGN_QUEUE })],
   controllers: [BrandKitController, DesignController, TemplateController],
   providers: [BrandKitService, DesignService, DesignGenerationService, DesignGenerationProcessor],
+  exports: [DesignService, BrandKitService],
 })
 export class DesignModule {}

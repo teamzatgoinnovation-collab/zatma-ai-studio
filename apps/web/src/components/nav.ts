@@ -71,9 +71,8 @@ export const NAV: NavSection[] = [
       {
         label: 'AI Copywriter',
         href: '/studio/copywriter',
-        phase: 6,
         description: 'Headlines, captions, hashtags and ad copy in seven languages.',
-        features: ['Tone, audience, goal and platform controls', 'Variants, regeneration and translation', 'Save as template or link to a campaign'],
+        features: ['Tone, audience, goal and platform controls', 'Variants, rewriting and translation', 'Saved copy library'],
         keywords: ['captions', 'hashtags', 'text'],
       },
       {

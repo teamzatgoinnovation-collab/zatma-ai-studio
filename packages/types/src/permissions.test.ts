@@ -24,6 +24,13 @@ describe('RBAC permission map', () => {
     expect(hasPermissions('VIEWER', ['workspace:read'])).toBe(true);
     expect(hasPermissions('VIEWER', ['workspace:create'])).toBe(false);
     expect(hasPermissions('VIEWER', ['crm:write'])).toBe(false);
+    expect(hasPermissions('VIEWER', ['copy:read'])).toBe(true);
+    expect(hasPermissions('VIEWER', ['copy:write'])).toBe(false);
+  });
+
+  it('lets content roles write copy', () => {
+    for (const role of ['MARKETING_MANAGER', 'DESIGNER', 'ADMIN'] as const) expect(hasPermissions(role, ['copy:write', 'ai:generate'])).toBe(true);
+    expect(hasPermissions('ANALYST', ['copy:write'])).toBe(false);
   });
 
   it('denies everything when there is no role', () => {
