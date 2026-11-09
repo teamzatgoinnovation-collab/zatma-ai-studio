@@ -52,3 +52,5 @@ Create an OAuth client (Web) in Google Cloud with the authorised redirect URI `$
 
 ### Object storage CORS
 Browsers upload directly to the bucket with presigned PUT URLs, so the bucket's CORS rules must allow `PUT` and `GET` from the web origin.
+
+`GET` is also required by the design editor: it draws stored images onto a canvas with `crossOrigin="anonymous"`. Without a matching `Access-Control-Allow-Origin` on `GET`, the canvas is tainted and PNG/JPG/PDF export fails with a clear error message. Example rule: origins `https://app.example.com`, methods `GET, PUT, HEAD`, headers `*`, expose `ETag`.

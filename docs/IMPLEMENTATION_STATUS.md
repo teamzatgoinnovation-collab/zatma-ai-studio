@@ -6,8 +6,8 @@
 | 1 | Foundation & architecture | ✅ Completed |
 | 2 | Authentication, organizations & SaaS billing | ✅ Completed |
 | 3 | Modern SaaS UI/UX | ✅ Completed |
-| 4 | AI provider integration | ✅ Completed (awaiting approval for Phase 5) |
-| 5 | AI Design Studio | ⏳ Pending |
+| 4 | AI provider integration | ✅ Completed |
+| 5 | AI Design Studio | ✅ Completed (awaiting approval for Phase 6) |
 | 6 | AI Copywriter | ⏳ Pending |
 | 7 | CRM core | ⏳ Pending |
 | 8 | AI lead scoring & intelligence | ⏳ Pending |
@@ -307,3 +307,89 @@ The 10 new AI e2e tests cover:
 * Prompt → design brief → copy → background image → layered editable design.
 * Canvas editor (Konva/Fabric) with platform size presets.
 * Brand Kit, and export to PNG, JPG and PDF.
+
+## Phase 5: AI Design Studio (✅ Completed)
+
+### Features implemented
+* **Layered design model** (`packages/validation/src/design.ts`):
+  * Seven platform size presets with safe areas: Instagram Post and Story, Facebook Post and Cover, LinkedIn Post, YouTube Thumbnail, WhatsApp Status.
+  * A strict Zod document schema: a colour, gradient or image background, plus text, image and shape layers. Images are referenced only by stored-file id, never by URL. Max 60 layers.
+  * A font catalogue with a script-aware default per language (Noto Sans for Malayalam, Arabic with RTL, Hindi, Tamil, Kannada, Telugu).
+* **Generation pipeline** (`apps/api/src/design/`), run on the BullMQ `design-generation` queue inside the tenant's context:
+  1. **Brief and copy** as JSON from the text provider chain: headline, subheadline, body, CTA, badge, caption, hashtags, layout and a background prompt. Invalid output gets one repair retry, then fails with `AI_BRIEF_INVALID`.
+  2. **Optional background image** from the image chain. The prompt forbids any text in the image. If there's no image provider or the call fails, a brand gradient is used and the design still succeeds.
+  3. **Deterministic composition** (`composer.ts`): four layouts, everything kept inside the safe area, font size fitted to text length and script, brand colours and fonts, a logo layer, a CTA pill and a footer with website, phone and WhatsApp. **All text stays as live, editable layers**; nothing is baked into the image.
+* **Design API:**
+  * Brand kits: CRUD, with a single default per organization.
+  * Designs: list and search, blank or from a template, generate (202), get (with signed asset URLs), autosave, duplicate, soft delete, thumbnail.
+  * Optimistic concurrency: `revision` on every save; a stale save gets `409 REVISION_CONFLICT`.
+  * Versions (save and restore) and organization templates.
+  * Every file id in a document must be an uploaded file of the same organization.
+* **Web: AI Studio:**
+  * **AI Design Generator** (`/studio/design`): prompt box with examples (including the spec's Malayalam ZatGo Van Sales ERP ad), size chips, language, brand kit, AI-background toggle (disabled without an image provider) and a credit estimate. Below it, the design library with search, duplicate, delete and "Blank design".
+  * **AI Poster Generator** (`/studio/posters`): the same generator with occasion presets (Onam, Vishu, Eid, Diwali, Christmas, Ramadan, Grand opening, Flash sale) and story-size defaults.
+  * **Editor** (`/studio/design/[id]`, react-konva):
+    * Select, drag, resize and rotate with snapping guides to canvas edges and centre; double-click text to type on the canvas.
+    * Layers panel (show/hide, lock, reorder), Add panel (heading, paragraph, rectangle, ellipse, image upload, brand logo), Background panel (colour, gradient, image with overlay), Copy panel (caption and hashtags with copy buttons).
+    * Properties panel: text content, font, size, weight, line height, letter spacing, alignment, colour, CTA pill; shape fill and border; image fit, corner radius and replace; position, size, rotation and opacity; arrange and duplicate.
+    * Undo/redo (100 steps), align to canvas, zoom (fit, steps), grid, keyboard shortcuts (arrows, Shift+arrows, Delete, Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y, Ctrl+D).
+    * Debounced autosave with a save-state indicator, a conflict banner with reload, and a warning before closing with unsaved changes.
+    * Export PNG and JPG at full preset resolution, and PDF (jsPDF). Thumbnails are uploaded automatically for the library.
+    * Version history dialog, Save as template, Duplicate.
+    * Read-only mode for roles without `design:write`.
+    * Fonts are loaded from Google Fonts and awaited before Konva measures text. Script fonts fall back to Inter for Latin characters.
+  * **Brand Kit** (`/studio/brand-kit`): logo upload, five colours, heading and body fonts, tagline, contact details, AI guidelines, default kit.
+  * **Templates** (`/studio/templates`): grouped by category, "Use template" and delete.
+  * Navigation: AI Studio, Design, Posters, Templates and Brand Kit are now live. Video (Phase 16) and Copywriter (Phase 6) still show their phase.
+* **Accessibility fixes** found by axe this phase: darker light-theme status colours for toasts, and dark text on the dark-theme destructive badge.
+
+### Database changes
+Migrations `20261109064731_phase5_design_studio` and `20261109065106_design_generation_options`:
+* New tables `brand_kit`, `design` (with `DesignStatus`, `revision`, `generationOptions`, soft delete), `design_version` and `template`.
+* All four are tenant-scoped models.
+* Upload purposes gain `THUMBNAIL`.
+
+### APIs
+See `API_DOCUMENTATION.md` → Phase 5 endpoints (brand kits, designs, versions, templates).
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| API unit tests (composer, brief parsing) | ✅ 65 passed (33 new) |
+| API e2e tests (15 files) | ✅ 70 passed (8 new design) |
+| Web unit tests (editor reducer, geometry, export, fonts, studio helpers, nav) | ✅ 47 passed (23 new) |
+| Lint, typecheck, build | ✅ |
+
+The composer tests check, for every preset, that layers stay inside the canvas and safe area, plus long-text scaling, Arabic RTL, brand colours, fonts, logo and footer, and the gradient fallback.
+
+The 8 design e2e tests cover:
+* brand kit CRUD and the default rule
+* Malayalam generation with a stored AI background, metered credits and version 1
+* the gradient fallback without an image provider, and the JSON repair retry
+* `FAILED` with `AI_BRIEF_INVALID` after two invalid briefs
+* 503 with no text provider, and 402 at the credit limit
+* revision conflicts (409) and rejection of another organization's files
+* versions and restore, duplicate, thumbnail, templates and delete
+* permissions (Viewer reads only) and tenant isolation of designs, brand kits and templates
+
+**Browser run (Playwright, real local services):** API with the real Anthropic and OpenAI SDKs pointed at a local stand-in, S3 (moto) with GET/PUT CORS, and a production web build. 28 checks passed with no console errors:
+* A brand kit was created with an uploaded logo and became the default.
+* The spec's Malayalam ZatGo prompt opened the editor with a 7-layer document: Malayalam headline, subheadline, body, badge, WhatsApp CTA, footer and logo, over a stored AI background, using Noto Sans Malayalam.
+* Edits worked: the headline text and colour, keyboard nudge, drag on the canvas, undo/redo with buttons and shortcuts, an image upload as a new layer, and reordering.
+* After a reload, autosave had persisted the colour, position and text (revision 2).
+* PNG export was 1080×1080; PDF export was a valid PDF.
+* A named version was saved; Save as template worked, and "Use template" started a new design.
+* The library showed a thumbnail.
+* axe reported no serious or critical violations on the brand kit, generator, editor (light and dark), templates and posters pages.
+* On an iPhone 14 viewport there was no horizontal page scroll.
+
+### Remaining issues / notes
+* **Not run against real provider APIs** (no keys yet). Generation uses the Phase 4 chain; add `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` / `GEMINI_API_KEY`.
+* **Bucket CORS must allow `GET`** from the web origin, otherwise the canvas cannot export designs containing stored images (see `INTEGRATIONS.md`).
+* **Editor fonts come from Google Fonts.** Self-hosting them is a deployment option (Phase 21).
+* **Global industry/festival template collections** are not included. Templates are organization-owned; curated platform templates belong to Super Admin (Phase 19).
+* **Export file names are ASCII** because browsers drop non-ASCII names for downloaded blobs (a Malayalam-only title exports as `design-<size>.png`).
+* **Not yet available:** multi-select, group editing, and resizing a design to another preset.
+
+### Next phase
+**Phase 6: AI Copywriter.** Headlines, captions, hashtags and ad copy in seven languages, with tone, audience, goal and platform controls, variants, regeneration and translation, saved as copy assets that can link to campaigns.

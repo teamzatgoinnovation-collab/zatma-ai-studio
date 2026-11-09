@@ -55,6 +55,21 @@ Gradients are reserved for the logo, the avatar and the auth hero. Avoid gradien
   * Modules that haven't shipped render a roadmap layout through the catch-all route `(app)/[...module]`. It shows the module's purpose, its planned capabilities and related features available now, and never sample data.
   * Unknown paths return a 404.
 
+## Design editor (Phase 5)
+
+`apps/web/src/components/editor/`:
+* `state.ts`: a pure reducer holding the document, selection and 100-step undo/redo history.
+* `geometry.ts`: fit, zoom, snapping, crop and export maths.
+* `fonts.ts`: Google Fonts stylesheet, script-aware defaults and the canvas font stack.
+* `export.ts`: file names, PDF page sizing and downloads.
+* `design-canvas.tsx` (react-konva) and `panels.tsx`.
+
+Layout: a top bar (title, save state, undo/redo, zoom, grid, align, versions, template, duplicate, export), a tool panel on the left (Layers / Add / Bg / Copy), the canvas in the centre on a checkerboard, and properties on the right. Below `lg` the canvas comes first and the panels stack under it.
+
+Accessibility:
+* The canvas is a labelled `role="img"`. Everything you can do on the canvas can also be done from the Layers list and the Properties panel, using labelled inputs and buttons.
+* Keyboard shortcuts are ignored while typing in a field.
+
 ## Page states
 
 | State | Implementation |

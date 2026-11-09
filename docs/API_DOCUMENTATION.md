@@ -122,3 +122,39 @@ Error codes:
 * `AI_REQUEST_REJECTED` (422): the provider rejected the request as invalid.
 * `AI_PROVIDER_NOT_AVAILABLE` (422): the preferred provider isn't configured.
 * `PLAN_LIMIT_REACHED` (402): the plan's AI credits are used up.
+
+## Phase 5 endpoints
+
+Brand kits, designs and templates are tenant-scoped. Another organization's ids return `404`.
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/api/v1/brand-kits` | `design:read` | Brand kits, default first. `logoUrl` is a short-lived signed URL |
+| GET | `/api/v1/brand-kits/:id` | `design:read` | One brand kit |
+| POST | `/api/v1/brand-kits` | `design:write` | Create (`name`, `colors`, `fonts`, `logoFileId?`, contact details, `guidelines?`). The first kit becomes the default. Max 20 |
+| PATCH | `/api/v1/brand-kits/:id` | `design:write` | Partial update |
+| POST | `/api/v1/brand-kits/:id/default` | `design:write` | Make this the organization's default |
+| DELETE | `/api/v1/brand-kits/:id` | `design:write` | Delete. If it was the default, the oldest remaining kit becomes default |
+| GET | `/api/v1/designs` | `design:read` | Paginated library (`page`, `pageSize`, `q`, `workspaceId`) with thumbnail URLs |
+| POST | `/api/v1/designs` | `design:write` | Blank design from a preset, or from a template (`templateId`) |
+| POST | `/api/v1/designs/generate` | `design:write` + `ai:generate` | `{ prompt, sizePreset, language, brandKitId?, aiBackground, occasion? }` → `202 { design, jobId }` with status `GENERATING`. Poll `GET /designs/:id`. Throttled to 10/min |
+| GET | `/api/v1/designs/:id` | `design:read` | Document, caption, hashtags, status, error, `revision`, and `assets` (fileId → signed URL) |
+| PATCH | `/api/v1/designs/:id` | `design:write` | `{ revision, title?, document? }`. Stale revision → `409 REVISION_CONFLICT` with `currentRevision` |
+| POST | `/api/v1/designs/:id/duplicate` | `design:write` | Copy as a new design |
+| DELETE | `/api/v1/designs/:id` | `design:write` | Soft delete |
+| PUT | `/api/v1/designs/:id/thumbnail` | `design:write` | `{ fileId }` of an uploaded image (purpose `THUMBNAIL`) |
+| GET | `/api/v1/designs/:id/versions` | `design:read` | Saved versions, newest first |
+| POST | `/api/v1/designs/:id/versions` | `design:write` | Save a snapshot `{ note? }` |
+| POST | `/api/v1/designs/:id/versions/:versionId/restore` | `design:write` | Restore a snapshot (bumps the revision and records a new version) |
+| POST | `/api/v1/designs/:id/save-as-template` | `design:write` | `{ name, category }` |
+| GET | `/api/v1/templates` | `design:read` | Organization templates |
+| DELETE | `/api/v1/templates/:id` | `design:write` | Delete a template |
+
+Error codes:
+* `REVISION_CONFLICT` (409): the design changed since it was loaded.
+* `DESIGN_GENERATING` (409): the design can't be edited while it's being generated.
+* `DESIGN_NOT_READY` (409): only finished designs can become templates.
+* `SIZE_MISMATCH` (422): the document's size doesn't match the design.
+* `INVALID_ASSET` (422): a referenced file isn't an uploaded image of this organization.
+* `AI_PROVIDER_UNAVAILABLE` (503), `PLAN_LIMIT_REACHED` (402): as in Phase 4.
+* A generation failure is reported on the design (`status: FAILED`, `error.code`, for example `AI_BRIEF_INVALID`).
