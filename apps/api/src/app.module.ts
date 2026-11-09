@@ -12,6 +12,7 @@ import { AuthGuard } from './common/guards/auth.guard.js';
 import { requestContextMiddleware } from './common/request-context.middleware.js';
 import { ConfigModule, ENV } from './config/config.module.js';
 import { loadEnv, type Env } from './config/env.js';
+import { CopyModule } from './copy/copy.module.js';
 import { DesignModule } from './design/design.module.js';
 import { DevModule } from './dev/dev.module.js';
 import { EmailModule } from './email/email.module.js';
@@ -64,6 +65,7 @@ const bootEnv = loadEnv();
     AIProviderModule,
     BillingModule,
     DesignModule,
+    CopyModule,
     ...(bootEnv.NODE_ENV === 'production' ? [] : [DevModule]),
   ],
   providers: [

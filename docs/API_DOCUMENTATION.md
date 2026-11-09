@@ -158,3 +158,31 @@ Error codes:
 * `INVALID_ASSET` (422): a referenced file isn't an uploaded image of this organization.
 * `AI_PROVIDER_UNAVAILABLE` (503), `PLAN_LIMIT_REACHED` (402): as in Phase 4.
 * A generation failure is reported on the design (`status: FAILED`, `error.code`, for example `AI_BRIEF_INVALID`).
+
+## Phase 6 endpoints
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| POST | `/api/v1/copy/generate` | `copy:write` + `ai:generate` | `{ kind, brief, language, tone, platform, goal, audience?, keywords[], brandKitId?, variants 1–5, includeEmojis, includeHashtags }` → `{ variants: [{ text, hashtags, limits }], provider, model, credits }`. Nothing is saved. Throttled to 20/min |
+| POST | `/api/v1/copy/translate` | `copy:write` + `ai:generate` | `{ text, hashtags[], sourceLanguage?, targetLanguages[1–6], tone? }` → `{ translations: [{ language, text, hashtags, warnings[] }] }`. Warnings list numbers, phone numbers or URLs that changed |
+| POST | `/api/v1/copy/rewrite` | `copy:write` + `ai:generate` | `{ text, language, action: shorter \| longer \| more_formal \| more_casual \| more_persuasive \| add_emojis \| remove_emojis \| custom, instruction? }` → `{ text }` |
+| GET | `/api/v1/copy-assets` | `copy:read` | Saved copy, favourites first (`page`, `pageSize`, `q`, `kind`, `language`, `favorite=true\|false`, `workspaceId`) |
+| GET | `/api/v1/copy-assets/:id` | `copy:read` | One saved item |
+| POST | `/api/v1/copy-assets` | `copy:write` | Save `{ kind, content, hashtags[], language, platform, tone?, goal?, audience?, brief?, variants[]?, brandKitId?, sourceDesignId?, favorite }` |
+| PATCH | `/api/v1/copy-assets/:id` | `copy:write` | `{ content?, hashtags?, favorite? }` |
+| DELETE | `/api/v1/copy-assets/:id` | `copy:write` | Soft delete |
+| POST | `/api/v1/designs/:id/translate` | `design:write` + `ai:generate` | `{ language }` → the new translated design (`201`). Text layers, caption and hashtags are localised; fonts, direction and sizes adapt |
+
+Every `limits` object reports:
+* `count`: user-perceived characters.
+* `recommended` and `max`: the soft recommendation and the hard platform limit.
+* `long` and `overLimit`: whether the text exceeds each.
+* `hashtagCount` and `maxHashtags`.
+* `sms`: the encoding and number of segments, for SMS copy.
+
+Error codes:
+* `AI_OUTPUT_INVALID` (422): the AI reply was unusable after one repair attempt.
+* `SAME_LANGUAGE` (422): the design is already in that language.
+* `NOTHING_TO_TRANSLATE` (422): the design has no text to translate.
+* `DESIGN_GENERATING` (409): the design is still being generated.
+* `AI_PROVIDER_UNAVAILABLE` (503) and `PLAN_LIMIT_REACHED` (402): as in Phase 4.

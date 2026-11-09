@@ -35,6 +35,7 @@ model User {
   generationJobs GenerationJob[]
   designs        Design[]
   designVersions DesignVersion[]
+  copyAssets     CopyAsset[]
 
   @@map("user")
 }
@@ -118,6 +119,7 @@ model Organization {
   brandKits      BrandKit[]
   designs        Design[]
   templates      Template[]
+  copyAssets     CopyAsset[]
   invoices       Invoice[]
   payments       Payment[]
 
@@ -169,6 +171,7 @@ model Workspace {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   brandKits    BrandKit[]
   designs      Design[]
+  copyAssets   CopyAsset[]
 
   @@index([organizationId])
   @@map("workspace")
@@ -471,6 +474,7 @@ model BrandKit {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workspace    Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   designs      Design[]
+  copyAssets   CopyAsset[]
 
   @@index([organizationId])
   @@map("brand_kit")
@@ -517,6 +521,7 @@ model Design {
   brandKit     BrandKit?       @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
   createdBy    User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
   versions     DesignVersion[]
+  copyAssets   CopyAsset[]
 
   @@index([organizationId, updatedAt])
   @@map("design")
@@ -556,4 +561,41 @@ model Template {
 
   @@index([organizationId, createdAt])
   @@map("template")
+}
+
+/// Saved marketing copy (Phase 6). Reusable by campaigns (P12), social posts (P10) and messaging (P14).
+model CopyAsset {
+  id             String    @id @default(uuid(7))
+  organizationId String
+  workspaceId    String
+  kind           String
+  content        String
+  hashtags       String[]  @default([])
+  language       String    @default("en")
+  tone           String?
+  platform       String    @default("generic")
+  goal           String?
+  audience       String?
+  brief          String?
+  /// Sibling variants the content was picked from
+  variants       Json?
+  favorite       Boolean   @default(false)
+  brandKitId     String?
+  sourceDesignId String?
+  /// Campaign link; foreign key added with campaigns in Phase 12
+  campaignId     String?
+  createdById    String?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brandKit     BrandKit?    @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+  sourceDesign Design?      @relation(fields: [sourceDesignId], references: [id], onDelete: SetNull)
+  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, updatedAt])
+  @@index([organizationId, kind])
+  @@map("copy_asset")
 }

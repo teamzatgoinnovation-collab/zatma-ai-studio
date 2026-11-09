@@ -15,6 +15,7 @@ import {
   Download,
   Grid3x3,
   History,
+  Languages,
   LayoutTemplate,
   Loader2,
   Minus,
@@ -52,6 +53,7 @@ import { DesignCanvas, type DesignCanvasHandle } from './design-canvas';
 import { buildPdf, dataUrlToBlob, downloadBlob, exportFileName, type ExportFormat } from './export';
 import { defaultFontFor, fontStack, GOOGLE_FONTS_HREF, loadFonts } from './fonts';
 import { fitScale, nextZoom } from './geometry';
+import { AiRewriteMenu, TranslateDesignDialog } from './ai-tools';
 import { AddPanel, BackgroundPanel, CopyPanel, LayersPanel, PropertiesPanel } from './panels';
 import { editorReducer, initialState, type AlignMode } from './state';
 
@@ -128,7 +130,10 @@ export function DesignEditor({ designId }: { designId: string }) {
     );
   }
 
-  const readOnly = !(org.data?.permissions.includes('design:write') ?? false);
+  const perms = new Set(org.data?.permissions ?? []);
+  const readOnly = !perms.has('design:write');
+  const canAi = !readOnly && perms.has('ai:generate');
+  const canSaveCopy = perms.has('copy:write');
   const kit = brandKits.data?.find((k) => k.id === d.brandKitId) ?? brandKits.data?.find((k) => k.isDefault) ?? null;
 
   return (
@@ -136,6 +141,8 @@ export function DesignEditor({ designId }: { designId: string }) {
       key={`${d.id}:${reloadKey}`}
       detail={d}
       readOnly={readOnly}
+      canAi={canAi}
+      canSaveCopy={canSaveCopy}
       brandKit={kit}
       onReplace={(next) => {
         qc.setQueryData(['design', designId], next);
@@ -169,12 +176,16 @@ type LeftTab = 'layers' | 'add' | 'background' | 'copy';
 function EditorWorkspace({
   detail,
   readOnly,
+  canAi,
+  canSaveCopy,
   brandKit,
   onReplace,
   onReload,
 }: {
   detail: DesignDetail;
   readOnly: boolean;
+  canAi: boolean;
+  canSaveCopy: boolean;
   brandKit: BrandKitDto | null;
   onReplace: (d: DesignDetail) => void;
   onReload: () => Promise<void>;
@@ -195,7 +206,7 @@ function EditorWorkspace({
   const [viewport, setViewport] = useState({ width: 800, height: 600 });
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<{ layer: TextLayer; rect: { x: number; y: number; width: number; height: number } } | null>(null);
-  const [dialog, setDialog] = useState<'versions' | 'template' | null>(null);
+  const [dialog, setDialog] = useState<'versions' | 'template' | 'translate' | null>(null);
 
   // Save bookkeeping. `changeKey` grows on every document or title edit.
   const changeKey = state.version + titleEdits;
@@ -553,6 +564,11 @@ function EditorWorkspace({
             <Button variant="ghost" size="icon" aria-label="Save as template" title="Save as template" onClick={() => setDialog('template')}>
               <LayoutTemplate aria-hidden="true" />
             </Button>
+            {canAi && (
+              <Button variant="ghost" size="icon" aria-label="Translate design" title="Translate design" onClick={() => setDialog('translate')}>
+                <Languages aria-hidden="true" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -646,7 +662,25 @@ function EditorWorkspace({
                 }}
               />
             )}
-            {leftTab === 'copy' && <CopyPanel caption={detail.caption} hashtags={detail.hashtags} />}
+            {leftTab === 'copy' && (
+              <CopyPanel
+                caption={detail.caption}
+                hashtags={detail.hashtags}
+                onSave={
+                  canSaveCopy
+                    ? async (kind, content, hashtags) => {
+                        try {
+                          await api.copyAssets.save({ kind, content, hashtags, language: detail.language as 'en', platform: 'instagram', sourceDesignId: detail.id });
+                          await qc.invalidateQueries({ queryKey: ['copy-assets'] });
+                          toast.success('Saved to your copy library');
+                        } catch (e) {
+                          toast.error(describeError(e));
+                        }
+                      }
+                    : undefined
+                }
+              />
+            )}
           </div>
         </aside>
 
@@ -694,6 +728,11 @@ function EditorWorkspace({
               dispatch={dispatch}
               readOnly={readOnly}
               onDuplicate={() => dispatch({ type: 'duplicateLayer', id: selected.id, newId: newLayerId() })}
+              textTools={
+                canAi
+                  ? (l) => <AiRewriteMenu text={l.text} language={detail.language} disabled={l.locked} onApply={(text) => dispatch({ type: 'updateLayer', id: l.id, patch: { text } })} />
+                  : undefined
+              }
               onReplaceImage={async (f) => {
                 const r = await upload(f);
                 if (!r) return;
@@ -730,6 +769,20 @@ function EditorWorkspace({
           onReplace(d);
         }}
       />
+      {canAi && (
+        <TranslateDesignDialog
+          open={dialog === 'translate'}
+          onOpenChange={(o) => setDialog(o ? 'translate' : null)}
+          designId={detail.id}
+          currentLanguage={detail.language}
+          flush={flush}
+          onTranslated={async (d) => {
+            setDialog(null);
+            await qc.invalidateQueries({ queryKey: ['designs'] });
+            router.push(`/studio/design/${d.id}`);
+          }}
+        />
+      )}
       <TemplateDialog open={dialog === 'template'} onOpenChange={(o) => setDialog(o ? 'template' : null)} designId={detail.id} defaultName={title} flush={flush} />
     </div>
   );

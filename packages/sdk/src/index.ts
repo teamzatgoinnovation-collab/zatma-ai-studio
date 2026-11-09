@@ -24,6 +24,15 @@ import type {
   Workspace,
 } from '@zatma/types';
 import type {
+  CopyAssetDto,
+  CopyGenerationResult,
+  CopyRewriteResult,
+  CopyTranslationResult,
+  GenerateCopyInput,
+  RewriteCopyInput,
+  SaveCopyAssetInput,
+  TranslateCopyInput,
+  UpdateCopyAssetInput,
   BrandKitDto,
   BrandKitInput,
   CreateDesignInput,
@@ -165,6 +174,20 @@ export function createApiClient(options: ApiClientOptions) {
       saveVersion: (designId: string, note?: string) => request<DesignVersionSummary>('POST', `/designs/${id(designId)}/versions`, { note }),
       restoreVersion: (designId: string, versionId: string) => request<DesignDetail>('POST', `/designs/${id(designId)}/versions/${id(versionId)}/restore`),
       saveAsTemplate: (designId: string, input: SaveTemplateInput) => request<TemplateSummary>('POST', `/designs/${id(designId)}/save-as-template`, input),
+      translate: (designId: string, language: string) => request<DesignDetail>('POST', `/designs/${id(designId)}/translate`, { language }),
+    },
+    copy: {
+      generate: (input: Partial<GenerateCopyInput> & Pick<GenerateCopyInput, 'kind' | 'brief'>) => request<CopyGenerationResult>('POST', '/copy/generate', input),
+      translate: (input: Partial<TranslateCopyInput> & Pick<TranslateCopyInput, 'text' | 'targetLanguages'>) => request<CopyTranslationResult>('POST', '/copy/translate', input),
+      rewrite: (input: Partial<RewriteCopyInput> & Pick<RewriteCopyInput, 'text' | 'action'>) => request<CopyRewriteResult>('POST', '/copy/rewrite', input),
+    },
+    copyAssets: {
+      list: (query?: { page?: number; pageSize?: number; q?: string; kind?: string; language?: string; favorite?: 'true' | 'false' }) =>
+        request<Paginated<CopyAssetDto>>('GET', '/copy-assets', undefined, query),
+      get: (assetId: string) => request<CopyAssetDto>('GET', `/copy-assets/${id(assetId)}`),
+      save: (input: Partial<SaveCopyAssetInput> & Pick<SaveCopyAssetInput, 'kind' | 'content'>) => request<CopyAssetDto>('POST', '/copy-assets', input),
+      update: (assetId: string, input: UpdateCopyAssetInput) => request<CopyAssetDto>('PATCH', `/copy-assets/${id(assetId)}`, input),
+      remove: (assetId: string) => request<void>('DELETE', `/copy-assets/${id(assetId)}`),
     },
     templates: {
       list: () => request<TemplateSummary[]>('GET', '/templates'),

@@ -70,6 +70,17 @@ Accessibility:
 * The canvas is a labelled `role="img"`. Everything you can do on the canvas can also be done from the Layers list and the Properties panel, using labelled inputs and buttons.
 * Keyboard shortcuts are ignored while typing in a field.
 
+## AI Copywriter (Phase 6)
+
+`components/studio/copywriter.tsx` has two tabs:
+* **Write:** the form card on the left and the variant cards on the right. They stack below `xl`.
+* **Library:** filters, then a two-column card grid.
+
+Variant cards:
+* Copy is shown with `dir` and `lang` set, so Arabic renders right-to-left and screen readers pick the right voice.
+* The length badge is neutral within limits, amber when longer than recommended, and red when over a hard platform limit. The detail line explains why in words, so the meaning does not rely on colour.
+* The rewrite and translate actions reuse the dialog and menu primitives. Rewrites can be undone on the card (in the editor, with Ctrl+Z).
+
 ## Page states
 
 | State | Implementation |

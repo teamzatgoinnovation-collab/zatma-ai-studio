@@ -48,7 +48,7 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 | `design_version` | ✅ P5 | organizationId, designId, revision, document, note, createdById |
 | `template` | ✅ P5 | organizationId, name, category, sizePreset, width, height, document, thumbnailFileId, createdById (global templates: Phase 19) |
 | `generation_job` | ✅ P4 | organizationId, userId, type, status (QUEUED/RUNNING/SUCCEEDED/FAILED), purpose, input, output (text or fileIds), errorCode/errorMessage, provider, model, credits, timestamps |
-| `copy_asset` | P6 | organizationId, kind (HEADLINE/CAPTION/…), language, tone, content, variants, campaignId? |
+| `copy_asset` | ✅ P6 | organizationId, workspaceId, kind, content, hashtags[], language, tone, platform, goal, audience, brief, variants (JSON), favorite, brandKitId?, sourceDesignId?, campaignId? (FK in P12), createdById, deletedAt |
 | `video` | P16 | organizationId, script, storyboard, fileId, status, durationSec |
 
 ## CRM (planned, Phase 7–8)

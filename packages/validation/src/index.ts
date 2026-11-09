@@ -209,3 +209,4 @@ export const aiSettingsSchema = z
   .strict();
 export type AISettingsInput = z.infer<typeof aiSettingsSchema>;
 export * from './design.js';
+export * from './copy.js';

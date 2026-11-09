@@ -2,6 +2,7 @@
 
 import {
   ArrowDown,
+  Bookmark,
   ArrowUp,
   BringToFront,
   Copy,
@@ -327,7 +328,7 @@ export function BackgroundPanel({
 
 // ───────────── Copy ─────────────
 
-export function CopyPanel({ caption, hashtags }: { caption: string | null; hashtags: string[] }) {
+export function CopyPanel({ caption, hashtags, onSave }: { caption: string | null; hashtags: string[]; onSave?: (kind: 'caption' | 'hashtags', content: string, hashtags: string[]) => void }) {
   const copy = async (text: string, what: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -343,17 +344,31 @@ export function CopyPanel({ caption, hashtags }: { caption: string | null; hasht
       {caption && (
         <PanelSection title="Caption">
           <p className="whitespace-pre-wrap text-sm">{caption}</p>
-          <Button size="sm" variant="outline" onClick={() => void copy(caption, 'Caption')}>
-            <Copy aria-hidden="true" /> Copy caption
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => void copy(caption, 'Caption')}>
+              <Copy aria-hidden="true" /> Copy caption
+            </Button>
+            {onSave && (
+              <Button size="sm" variant="outline" onClick={() => onSave('caption', caption, hashtags)}>
+                <Bookmark aria-hidden="true" /> Save to library
+              </Button>
+            )}
+          </div>
         </PanelSection>
       )}
       {hashtags.length > 0 && (
         <PanelSection title="Hashtags">
           <p className="text-sm text-primary">{tags}</p>
-          <Button size="sm" variant="outline" onClick={() => void copy(tags, 'Hashtags')}>
-            <Copy aria-hidden="true" /> Copy hashtags
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => void copy(tags, 'Hashtags')}>
+              <Copy aria-hidden="true" /> Copy hashtags
+            </Button>
+            {onSave && (
+              <Button size="sm" variant="outline" onClick={() => onSave('hashtags', tags, [])}>
+                <Bookmark aria-hidden="true" /> Save to library
+              </Button>
+            )}
+          </div>
         </PanelSection>
       )}
     </div>
@@ -370,19 +385,22 @@ export function PropertiesPanel({
   readOnly,
   onReplaceImage,
   onDuplicate,
+  textTools,
 }: {
   layer: DesignLayer;
   dispatch: Dispatch;
   readOnly: boolean;
   onReplaceImage: (file: File) => void;
   onDuplicate: () => void;
+  /** Extra controls under the text content (e.g. AI rewrite). */
+  textTools?: (layer: TextLayer) => ReactNode;
 }) {
   const disabled = readOnly || layer.locked;
   const set = (patch: Partial<DesignLayer>) => dispatch({ type: 'updateLayer', id: layer.id, patch });
   return (
     <div>
       <PanelSection title={layer.type === 'text' ? 'Text' : layer.type === 'image' ? 'Image' : 'Shape'}>
-        {layer.type === 'text' && <TextProps layer={layer} set={set} disabled={disabled} />}
+        {layer.type === 'text' && <TextProps layer={layer} set={set} disabled={disabled} tools={textTools?.(layer)} />}
         {layer.type === 'shape' && <ShapeProps layer={layer} set={set} disabled={disabled} />}
         {layer.type === 'image' && <ImageProps layer={layer} set={set} disabled={disabled} onReplace={onReplaceImage} />}
       </PanelSection>
@@ -418,7 +436,7 @@ export function PropertiesPanel({
   );
 }
 
-function TextProps({ layer, set, disabled }: { layer: TextLayer; set: (p: Partial<TextLayer>) => void; disabled: boolean }) {
+function TextProps({ layer, set, disabled, tools }: { layer: TextLayer; set: (p: Partial<TextLayer>) => void; disabled: boolean; tools?: ReactNode }) {
   const id = useId();
   return (
     <>
@@ -435,6 +453,7 @@ function TextProps({ layer, set, disabled }: { layer: TextLayer; set: (p: Partia
           className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
         />
       </div>
+      {tools}
       <div className="space-y-1.5">
         <Label htmlFor={`${id}-font`}>Font</Label>
         <Select id={`${id}-font`} value={layer.fontFamily} disabled={disabled} onChange={(e) => set({ fontFamily: e.target.value as TextLayer['fontFamily'] })}>
@@ -483,7 +502,7 @@ function TextProps({ layer, set, disabled }: { layer: TextLayer; set: (p: Partia
           </Button>
         </>
       ) : (
-        <Button size="sm" variant="outline" disabled={disabled} onClick={() => set({ background: { fill: '#6366F1', cornerRadius: 999, padding: Math.round(layer.fontSize * 0.4) } })}>
+        <Button size="sm" variant="outline" disabled={disabled} onClick={() => set({ background: { fill: '#6366F1', cornerRadius: 500, padding: Math.round(layer.fontSize * 0.4) } })}>
           Add button pill
         </Button>
       )}

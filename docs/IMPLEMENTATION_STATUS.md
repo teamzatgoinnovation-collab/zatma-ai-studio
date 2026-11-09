@@ -7,8 +7,8 @@
 | 2 | Authentication, organizations & SaaS billing | ✅ Completed |
 | 3 | Modern SaaS UI/UX | ✅ Completed |
 | 4 | AI provider integration | ✅ Completed |
-| 5 | AI Design Studio | ✅ Completed (awaiting approval for Phase 6) |
-| 6 | AI Copywriter | ⏳ Pending |
+| 5 | AI Design Studio | ✅ Completed |
+| 6 | AI Copywriter | ✅ Completed (awaiting approval for Phase 7) |
 | 7 | CRM core | ⏳ Pending |
 | 8 | AI lead scoring & intelligence | ⏳ Pending |
 | 9 | Social media account integration | ⏳ Pending |
@@ -393,3 +393,92 @@ The 8 design e2e tests cover:
 
 ### Next phase
 **Phase 6: AI Copywriter.** Headlines, captions, hashtags and ad copy in seven languages, with tone, audience, goal and platform controls, variants, regeneration and translation, saved as copy assets that can link to campaigns.
+
+## Phase 6: AI Copywriter (✅ Completed)
+
+### Features implemented
+* **Copy model** (`packages/validation/src/copy.ts`):
+  * 11 copy types: headline, social caption, hashtags, ad primary text, ad headline, ad description, product description, call to action, WhatsApp message, email subject, SMS.
+  * 10 platforms, 8 tones and 6 goals.
+  * Recommended lengths per type, plus the hard limits the platforms enforce: Instagram 2,200 characters and 30 hashtags, LinkedIn 3,000, Google Ads headlines 30 and descriptions 90, email subjects 150, and others.
+  * Length is counted in user-perceived characters (a Malayalam conjunct or an emoji counts once).
+  * SMS shows its segment count: 160 characters per message in the basic (GSM-7) alphabet, 70 for Malayalam, Arabic and emoji.
+* **Generation** (`apps/api/src/copy/`):
+  * Requests run synchronously through the Phase 4 provider chain (purpose `copywriter`), returning 1–5 variants that each take a different angle.
+  * The prompts ask for native script in every language: natural Kerala Malayalam, and Modern Standard Arabic for GCC audiences.
+  * The model may only use facts from the request and the brand kit (website, phone, WhatsApp, email, address, guidelines); it must not invent prices, dates or contact details.
+  * Invalid JSON gets one repair retry, then fails with `AI_OUTPUT_INVALID`.
+  * Hashtags are normalised and de-duplicated, and every variant carries its length check.
+* **Translation:** one request localises copy into up to 6 languages. Afterwards, the service checks that every number, phone number and URL in the source appears in each translation, and adds a warning when one is missing or changed. Arabic-Indic digits count as equal.
+* **Rewriting:** shorter, longer, more formal, more casual, more persuasive, add or remove emojis, or a custom instruction.
+* **Copy library:** saved copy (`copy_asset`) with the request it came from and its sibling variants.
+  * Search, plus filters by type, language and favourites (favourites are listed first).
+  * Edit and soft delete.
+  * Optional links to a brand kit, a source design and a future campaign (Phase 12).
+* **Design translation:** `POST /designs/:id/translate` creates a new design with every text layer, the caption and the hashtags localised in one AI call.
+  * Fonts switch only when the current font can't render the target script.
+  * Direction and alignment follow the language (Arabic is right-to-left).
+  * Font sizes shrink so the longer text fits each box.
+  * Images and layout are kept; the original design is unchanged, and the copy gets its own first version.
+* **Permissions:** new `copy:read` (every role) and `copy:write` (Owner, Admin, Marketing Manager, Designer).
+* **Web:**
+  * **AI Copywriter** (`/studio/copywriter`):
+    * **Write tab:** type chips, a brief with examples (including the spec's Malayalam ZatGo Van Sales ERP prompt), language, platform, tone, goal, audience, keywords, brand kit, variant count, and emoji and hashtag toggles.
+    * Each variant card shows its character count against the limit (with over-limit and SMS-segment details) and offers Copy, Save, Rewrite (with Undo) and Translate. Translations show side by side, right-to-left for Arabic, with any warnings and their own Copy and Save.
+    * **Library tab:** search, filters, favourites, edit and delete.
+  * **Design editor:**
+    * "Rewrite with AI" on text layers. The result is a normal edit, so Ctrl+Z undoes it.
+    * "Translate design" in the top bar opens the translated copy.
+    * "Save to library" on the caption and hashtags (linked to the design).
+  * Navigation: AI Copywriter is live.
+* **Fixed (Phase 5 bug found by the new tests):** the editor's "Add button pill" used a corner radius of 999, which the document schema rejects (max 500), so autosave failed after adding a pill. It now uses 500, which the canvas still draws as a full pill.
+
+### Database changes
+Migration `20261109094751_phase6_copywriter`: new tenant-scoped table `copy_asset`, linked to organization, workspace, brand kit, source design and creator, with indexes on `(organizationId, updatedAt)` and `(organizationId, kind)`.
+
+### APIs
+See `API_DOCUMENTATION.md` → Phase 6 endpoints.
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Validation unit (counting, limits, SMS, hashtags, translation safeguards, schemas) | ✅ 14 passed (9 new) |
+| Types unit (permissions) | ✅ 7 passed (1 new) |
+| API unit (prompts, output parsing, font and RTL localisation) | ✅ 71 passed (6 new) |
+| API e2e (16 files) | ✅ 79 passed (9 new copy) |
+| Web unit | ✅ 51 passed (4 new) |
+| Lint, typecheck, build | ✅ |
+
+The 9 copy e2e tests cover:
+* Malayalam generation: brand facts and limits included, credits metered.
+* The repair retry, and `AI_OUTPUT_INVALID` after two bad replies.
+* Hashtag normalisation, and over-limit Google Ads headlines.
+* Translation into Malayalam and Arabic, with the missing-number and missing-URL warning.
+* Rewrite.
+* Library: save, filter, favourite, edit and delete.
+* 503 with no provider; 402 at the credit limit.
+* Permissions (Viewer reads only, Designer writes) and tenant isolation, including another organization's brand kit.
+* Design translation to Arabic: right-to-left, Noto Sans Arabic, shrunk text, original unchanged, version note, `SAME_LANGUAGE`.
+
+**Browser run (Playwright, production build, real Anthropic SDK pointed at a local stand-in):** 24 checks passed with no console errors.
+* Copywriter:
+  * The Malayalam ZatGo example produced 3 variants with counts against the 300-character recommendation; the brand kit's WhatsApp number reached the prompt.
+  * Save, rewrite shorter and undo all worked.
+  * Translation to Arabic (right-to-left) and English, and saving a translation, worked.
+  * In the Library: language and favourite filters, and editing, worked.
+* Editor:
+  * "Rewrite with AI" on the headline, then Ctrl+Z, restored the original.
+  * The caption was saved with its design link.
+  * Translate design → Arabic opened a new right-to-left design with Noto Sans Arabic.
+* Accessibility and layout:
+  * axe found no serious or critical violations on the copywriter (light and dark), the translate dialog, the library and the Arabic editor.
+  * No horizontal scroll on an iPhone 14 viewport.
+
+### Remaining issues / notes
+* **Not run against real provider APIs** (no keys yet).
+* **Copy quality:** the prompts are tuned for native Malayalam and Gulf Arabic, but real output should be reviewed by native speakers once keys are added.
+* **Campaign links:** `campaignId` has no foreign key yet; it gets one with campaigns in Phase 12.
+* **Translated design titles** keep the source title plus the language name (for example "… (Arabic)").
+
+### Next phase
+**Phase 7: CRM core.** Leads, contacts, companies, customers, deals, a drag-and-drop sales pipeline, activities and follow-ups, with import/export, duplicate detection, assignment and full activity history.
