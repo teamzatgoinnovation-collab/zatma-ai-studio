@@ -6,7 +6,7 @@ const ORG = 'org-a';
 
 describe('tenant scoping', () => {
   it('covers the Phase 1 tenant models', () => {
-    expect([...TENANT_MODELS].sort()).toEqual(['AiUsage', 'AuditLog', 'GenerationJob', 'Invoice', 'Payment', 'StoredFile', 'Workspace']);
+    expect([...TENANT_MODELS].sort()).toEqual(['AiUsage', 'AuditLog', 'BrandKit', 'Design', 'DesignVersion', 'GenerationJob', 'Invoice', 'Payment', 'StoredFile', 'Template', 'Workspace']);
   });
 
   it('adds organizationId to read, update and delete filters', () => {

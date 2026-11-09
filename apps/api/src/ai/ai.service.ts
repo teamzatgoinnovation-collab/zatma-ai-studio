@@ -22,7 +22,7 @@ interface Attempt {
   message: string;
 }
 
-interface CallContext {
+export interface CallContext {
   organizationId: string;
   userId: string | null;
   purpose: string;
@@ -55,7 +55,7 @@ export class AIService {
 
   // ───────────────────────────── Settings ─────────────────────────────
 
-  private async orgPreferences(organizationId: string): Promise<{ textProvider: string | null; imageProvider: string | null }> {
+  async orgPreferences(organizationId: string): Promise<{ textProvider: string | null; imageProvider: string | null }> {
     const org = await this.prisma.system.organization.findUnique({ where: { id: organizationId }, select: { aiSettings: true } });
     const s = (org?.aiSettings ?? {}) as { textProvider?: string | null; imageProvider?: string | null };
     return { textProvider: s.textProvider ?? null, imageProvider: s.imageProvider ?? null };
@@ -159,7 +159,8 @@ export class AIService {
     );
   }
 
-  private async generateTextFor(ctx: CallContext, input: GenerateTextInput, timeoutMs?: number): Promise<TextGenerationResponse> {
+  /** Text generation for a known tenant context (used by queued work such as design generation). */
+  async generateTextFor(ctx: CallContext, input: GenerateTextInput, timeoutMs?: number): Promise<TextGenerationResponse> {
     await this.usage.assertWithinLimit(ctx.organizationId, 'aiCredits', estimateTextCredits(`${input.system ?? ''}${input.prompt}`, input.maxOutputTokens));
     const prefs = await this.orgPreferences(ctx.organizationId);
     const chain = this.registry.chain('TEXT', input.provider ?? prefs.textProvider);
@@ -193,7 +194,8 @@ export class AIService {
     return this.generateTextFor(this.context(input.purpose), input, SYNC_TEXT_TIMEOUT_MS);
   }
 
-  private async generateImagesFor(ctx: CallContext, input: GenerateImageInput) {
+  /** Image generation for a known tenant context; images are stored as private AI_IMAGE files. */
+  async generateImagesFor(ctx: CallContext, input: GenerateImageInput) {
     await this.usage.assertWithinLimit(ctx.organizationId, 'aiCredits', imageCredits(input.count));
     const prefs = await this.orgPreferences(ctx.organizationId);
     const chain = this.registry.chain('IMAGE', input.provider ?? prefs.imageProvider);

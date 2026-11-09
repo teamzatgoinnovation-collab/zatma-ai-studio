@@ -33,6 +33,8 @@ model User {
   files          StoredFile[]
   aiUsage        AiUsage[]
   generationJobs GenerationJob[]
+  designs        Design[]
+  designVersions DesignVersion[]
 
   @@map("user")
 }
@@ -113,6 +115,9 @@ model Organization {
   files          StoredFile[]
   aiUsage        AiUsage[]
   generationJobs GenerationJob[]
+  brandKits      BrandKit[]
+  designs        Design[]
+  templates      Template[]
   invoices       Invoice[]
   payments       Payment[]
 
@@ -162,6 +167,8 @@ model Workspace {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brandKits    BrandKit[]
+  designs      Design[]
 
   @@index([organizationId])
   @@map("workspace")
@@ -436,4 +443,117 @@ model GenerationJob {
 
   @@index([organizationId, createdAt])
   @@map("generation_job")
+}
+
+// ───────────────────────────── AI Design Studio ─────────────────────────────
+
+model BrandKit {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  workspaceId    String?
+  name           String
+  isDefault      Boolean  @default(false)
+  logoFileId     String?
+  /// { primary, secondary, accent, background, text } as #RRGGBB
+  colors         Json
+  /// { heading, body } font families from FONT_CATALOG
+  fonts          Json
+  tagline        String?
+  website        String?
+  phone          String?
+  whatsapp       String?
+  email          String?
+  address        String?
+  guidelines     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  designs      Design[]
+
+  @@index([organizationId])
+  @@map("brand_kit")
+}
+
+enum DesignStatus {
+  DRAFT
+  GENERATING
+  READY
+  FAILED
+}
+
+model Design {
+  id                String       @id @default(uuid(7))
+  organizationId    String
+  workspaceId       String
+  brandKitId        String?
+  title             String
+  prompt            String?
+  sizePreset        String
+  width             Int
+  height            Int
+  language          String       @default("en")
+  /// Layered design document (designDocumentSchema)
+  document          Json
+  /// Optimistic concurrency counter, incremented on every document/title save
+  revision          Int          @default(0)
+  status            DesignStatus @default(DRAFT)
+  generationJobId   String?
+  /// The generate request (size, language, aiBackground, occasion) the worker reads
+  generationOptions Json?
+  errorCode         String?
+  errorMessage      String?
+  thumbnailFileId   String?
+  caption           String?
+  hashtags          String[]     @default([])
+  createdById       String?
+  deletedAt         DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brandKit     BrandKit?       @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+  createdBy    User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  versions     DesignVersion[]
+
+  @@index([organizationId, updatedAt])
+  @@map("design")
+}
+
+model DesignVersion {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  designId       String
+  revision       Int
+  document       Json
+  note           String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  design    Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([designId, createdAt])
+  @@map("design_version")
+}
+
+model Template {
+  id              String   @id @default(uuid(7))
+  organizationId  String
+  name            String
+  category        String   @default("General")
+  sizePreset      String
+  width           Int
+  height          Int
+  document        Json
+  thumbnailFileId String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("template")
 }

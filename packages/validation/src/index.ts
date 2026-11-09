@@ -105,7 +105,7 @@ export const UPLOAD_MIME_TYPES = [
   'application/pdf',
   'text/csv',
 ] as const;
-export const UPLOAD_PURPOSES = ['LOGO', 'BRAND_ASSET', 'DESIGN_ASSET', 'IMPORT', 'OTHER'] as const;
+export const UPLOAD_PURPOSES = ['LOGO', 'BRAND_ASSET', 'DESIGN_ASSET', 'THUMBNAIL', 'IMPORT', 'OTHER'] as const;
 /** Purposes only the server assigns (never accepted from upload requests). */
 export const SERVER_FILE_PURPOSES = ['AI_IMAGE'] as const;
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -208,3 +208,4 @@ export const aiSettingsSchema = z
   })
   .strict();
 export type AISettingsInput = z.infer<typeof aiSettingsSchema>;
+export * from './design.js';
