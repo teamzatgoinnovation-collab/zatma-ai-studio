@@ -1,0 +1,310 @@
+// ZatGo AI Marketing: database schema.
+// Conventions: see docs/DATABASE_DESIGN.md. Every tenant-owned model has `organizationId`.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Identity (Better Auth core) ─────────────────────────────
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  locale        String   @default("en")
+  timezone      String   @default("Asia/Kolkata")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions    Session[]
+  accounts    Account[]
+  members     Member[]
+  invitations Invitation[]
+  auditLogs   AuditLog[]
+  files       StoredFile[]
+  aiUsage     AiUsage[]
+
+  @@map("user")
+}
+
+model Session {
+  id                   String   @id
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  activeOrganizationId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ───────────────────────────── Tenancy (Better Auth organization plugin + app fields) ─────────────────────────────
+
+model Organization {
+  id              String   @id
+  name            String
+  slug            String   @unique
+  logo            String?
+  metadata        String?
+  website         String?
+  industry        String?
+  timezone        String   @default("Asia/Kolkata")
+  defaultLanguage String   @default("en")
+  currency        String   @default("INR")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  members      Member[]
+  invitations  Invitation[]
+  workspaces   Workspace[]
+  subscription Subscription?
+  auditLogs    AuditLog[]
+  files        StoredFile[]
+  aiUsage      AiUsage[]
+
+  @@map("organization")
+}
+
+model Member {
+  id             String   @id
+  organizationId String
+  userId         String
+  role           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String   @id
+  organizationId String
+  email          String
+  role           String?
+  status         String   @default("pending")
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  inviterId      String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invitation")
+}
+
+model Workspace {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  name           String
+  description    String?
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("workspace")
+}
+
+// ───────────────────────────── Audit ─────────────────────────────
+
+model AuditLog {
+  id             String   @id @default(uuid(7))
+  organizationId String?
+  actorId        String?
+  action         String
+  resourceType   String
+  resourceId     String?
+  metadata       Json?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?         @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("audit_log")
+}
+
+// ───────────────────────────── Billing & usage ─────────────────────────────
+
+enum PlanCode {
+  FREE
+  STARTER
+  PROFESSIONAL
+  BUSINESS
+  AGENCY
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+model Plan {
+  id           String   @id @default(uuid(7))
+  code         PlanCode @unique
+  name         String
+  description  String?
+  priceMonthly Decimal? @db.Decimal(14, 2)
+  priceYearly  Decimal? @db.Decimal(14, 2)
+  currency     String   @default("INR")
+  /// { aiCredits, storageMb, members, socialAccounts, workspaces }. -1 = unlimited
+  limits       Json
+  isPublic     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plan")
+}
+
+model Subscription {
+  id                 String             @id @default(uuid(7))
+  organizationId     String             @unique
+  planId             String
+  status             SubscriptionStatus @default(ACTIVE)
+  interval           BillingInterval    @default(MONTHLY)
+  provider           String?
+  externalId         String?            @unique
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime?
+  trialEndsAt        DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         Plan         @relation(fields: [planId], references: [id])
+
+  @@map("subscription")
+}
+
+enum AICapability {
+  TEXT
+  IMAGE
+  VIDEO
+  EMBEDDING
+}
+
+enum AiUsageStatus {
+  SUCCEEDED
+  FAILED
+}
+
+model AiUsage {
+  id             String        @id @default(uuid(7))
+  organizationId String
+  userId         String?
+  capability     AICapability
+  provider       String
+  model          String
+  inputTokens    Int           @default(0)
+  outputTokens   Int           @default(0)
+  units          Int           @default(0)
+  costMicroUsd   BigInt        @default(0)
+  credits        Int           @default(0)
+  status         AiUsageStatus
+  createdAt      DateTime      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("ai_usage")
+}
+
+// ───────────────────────────── Storage ─────────────────────────────
+
+enum FileStatus {
+  PENDING
+  UPLOADED
+  DELETED
+}
+
+model StoredFile {
+  id             String     @id @default(uuid(7))
+  organizationId String
+  uploadedById   String?
+  key            String     @unique
+  bucket         String
+  fileName       String
+  mimeType       String
+  sizeBytes      Int
+  purpose        String
+  status         FileStatus @default(PENDING)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy   User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("stored_file")
+}

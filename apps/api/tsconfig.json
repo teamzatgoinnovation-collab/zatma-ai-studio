@@ -1,0 +1,12 @@
+{
+  "extends": "@zatma/config/tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src", "test", "prisma", "vitest.config.ts", "prisma.config.ts"]
+}

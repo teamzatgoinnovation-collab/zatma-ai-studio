@@ -1,0 +1,64 @@
+'use client';
+
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { Alert, Button, FieldError, Input, Label } from '@zatma/ui';
+import { signUpSchema, type SignUpInput } from '@zatma/validation';
+import { authClient } from '@/lib/auth-client';
+
+export function SignUpForm() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignUpInput>({ resolver: zodResolver(signUpSchema) });
+
+  const onSubmit = handleSubmit(async (values) => {
+    setError(null);
+    const { error: authError } = await authClient.signUp.email(values);
+    if (authError) {
+      setError(authError.message ?? 'Could not create your account');
+      return;
+    }
+    router.replace('/onboarding/organization');
+    router.refresh();
+  });
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+      {error && <Alert>{error}</Alert>}
+      <div className="space-y-2">
+        <Label htmlFor="name">Full name</Label>
+        <Input id="name" autoComplete="name" aria-invalid={!!errors.name} aria-describedby="name-error" {...register('name')} />
+        <FieldError id="name-error" message={errors.name?.message} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="email">Work email</Label>
+        <Input id="email" type="email" autoComplete="email" aria-invalid={!!errors.email} aria-describedby="email-error" {...register('email')} />
+        <FieldError id="email-error" message={errors.email?.message} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <Input
+          id="password"
+          type="password"
+          autoComplete="new-password"
+          aria-invalid={!!errors.password}
+          aria-describedby="password-error"
+          {...register('password')}
+        />
+        <FieldError id="password-error" message={errors.password?.message ?? undefined} />
+        {!errors.password && <p className="text-xs text-muted-foreground">At least 10 characters, with a letter and a number.</p>}
+      </div>
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting && <Loader2 className="animate-spin" aria-hidden="true" />}
+        Create account
+      </Button>
+    </form>
+  );
+}
