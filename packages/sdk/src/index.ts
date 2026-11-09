@@ -24,6 +24,17 @@ import type {
   Workspace,
 } from '@zatma/types';
 import type {
+  BrandKitDto,
+  BrandKitInput,
+  CreateDesignInput,
+  DesignDetail,
+  DesignSummary,
+  DesignVersionSummary,
+  GenerateDesignInput,
+  SaveTemplateInput,
+  TemplateSummary,
+  UpdateBrandKitInput,
+  UpdateDesignInput,
   AISettingsInput,
   ChangePlanInput,
   CreateGenerationJobInput,
@@ -89,6 +100,7 @@ export function createApiClient(options: ApiClientOptions) {
     return json as T;
   }
 
+  const id = (v: string) => encodeURIComponent(v);
   return {
     health: () => request<HealthStatus>('GET', '/health'),
     auth: {
@@ -132,6 +144,31 @@ export function createApiClient(options: ApiClientOptions) {
       checkout: (input: CheckoutInput) => request<CheckoutSession>('POST', '/billing/checkout', input),
       changePlan: (input: ChangePlanInput) => request<SubscriptionDetail | null>('POST', '/billing/change-plan', input),
       cancel: () => request<SubscriptionDetail | null>('POST', '/billing/cancel'),
+    },
+    brandKits: {
+      list: () => request<BrandKitDto[]>('GET', '/brand-kits'),
+      create: (input: BrandKitInput) => request<BrandKitDto>('POST', '/brand-kits', input),
+      update: (kitId: string, input: UpdateBrandKitInput) => request<BrandKitDto>('PATCH', `/brand-kits/${id(kitId)}`, input),
+      setDefault: (kitId: string) => request<BrandKitDto>('POST', `/brand-kits/${id(kitId)}/default`),
+      remove: (kitId: string) => request<void>('DELETE', `/brand-kits/${id(kitId)}`),
+    },
+    designs: {
+      list: (query?: { page?: number; pageSize?: number; q?: string; workspaceId?: string }) => request<Paginated<DesignSummary>>('GET', '/designs', undefined, query),
+      get: (designId: string) => request<DesignDetail>('GET', `/designs/${id(designId)}`),
+      create: (input: Partial<CreateDesignInput>) => request<DesignDetail>('POST', '/designs', input),
+      generate: (input: Partial<GenerateDesignInput> & Pick<GenerateDesignInput, 'prompt'>) => request<{ design: DesignDetail; jobId: string }>('POST', '/designs/generate', input),
+      update: (designId: string, input: UpdateDesignInput) => request<DesignDetail>('PATCH', `/designs/${id(designId)}`, input),
+      duplicate: (designId: string) => request<DesignDetail>('POST', `/designs/${id(designId)}/duplicate`),
+      remove: (designId: string) => request<void>('DELETE', `/designs/${id(designId)}`),
+      setThumbnail: (designId: string, fileId: string) => request<void>('PUT', `/designs/${id(designId)}/thumbnail`, { fileId }),
+      versions: (designId: string) => request<DesignVersionSummary[]>('GET', `/designs/${id(designId)}/versions`),
+      saveVersion: (designId: string, note?: string) => request<DesignVersionSummary>('POST', `/designs/${id(designId)}/versions`, { note }),
+      restoreVersion: (designId: string, versionId: string) => request<DesignDetail>('POST', `/designs/${id(designId)}/versions/${id(versionId)}/restore`),
+      saveAsTemplate: (designId: string, input: SaveTemplateInput) => request<TemplateSummary>('POST', `/designs/${id(designId)}/save-as-template`, input),
+    },
+    templates: {
+      list: () => request<TemplateSummary[]>('GET', '/templates'),
+      remove: (templateId: string) => request<void>('DELETE', `/templates/${id(templateId)}`),
     },
     ai: {
       providers: () => request<AIProviderInfo[]>('GET', '/ai/providers'),

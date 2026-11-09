@@ -39,14 +39,14 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 | `ai_usage` | ✅ P1, P4 | organizationId, userId?, capability (TEXT/IMAGE/VIDEO/EMBEDDING), provider, model, inputTokens, outputTokens, units, costMicroUsd, credits, status, purpose, jobId, errorKind, latencyMs. One row per provider attempt |
 | `stored_file` | ✅ P1 | organizationId, uploadedById, key (unique), bucket, mimeType, sizeBytes, purpose, status |
 
-## AI Studio (planned)
+## AI Studio
 
 | Table | Phase | Key fields |
 |---|---|---|
-| `brand_kit` | P5 | organizationId, workspaceId, name, logoFileId, colors (JSON), fonts (JSON), tagline, website, phone, guidelines |
-| `design` | P5 | organizationId, workspaceId, title, prompt, sizePreset, width, height, document (JSON layers), thumbnailFileId, status |
-| `design_version` | P5 | designId, document, createdById |
-| `template` | P5 | organizationId? (null = global), category, industry, sizePreset, document |
+| `brand_kit` | ✅ P5 | organizationId, workspaceId?, name, isDefault, logoFileId?, colors (JSON: primary/secondary/accent/background/text), fonts (JSON: heading/body), tagline, website, phone, whatsapp, email, address, guidelines |
+| `design` | ✅ P5 | organizationId, workspaceId, brandKitId?, title, prompt, sizePreset, width, height, language, document (JSON layers), revision, status (DRAFT/GENERATING/READY/FAILED), generationOptions, generationJobId, thumbnailFileId, caption, hashtags[], errorCode/errorMessage, createdById, deletedAt |
+| `design_version` | ✅ P5 | organizationId, designId, revision, document, note, createdById |
+| `template` | ✅ P5 | organizationId, name, category, sizePreset, width, height, document, thumbnailFileId, createdById (global templates: Phase 19) |
 | `generation_job` | ✅ P4 | organizationId, userId, type, status (QUEUED/RUNNING/SUCCEEDED/FAILED), purpose, input, output (text or fileIds), errorCode/errorMessage, provider, model, credits, timestamps |
 | `copy_asset` | P6 | organizationId, kind (HEADLINE/CAPTION/…), language, tone, content, variants, campaignId? |
 | `video` | P16 | organizationId, script, storyboard, fileId, status, durationSec |

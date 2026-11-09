@@ -46,13 +46,11 @@ export const NAV: NavSection[] = [
     label: 'AI Studio',
     href: '/studio',
     icon: Palette,
-    phase: 5,
     description: 'Create marketing designs, copy and videos from a text prompt.',
     children: [
       {
         label: 'AI Design Generator',
         href: '/studio/design',
-        phase: 5,
         description: 'Turn a prompt into an editable, on-brand marketing design.',
         features: ['Prompt → design brief → copy → background → layered design', 'Editable text, fonts, colours, images and layout', 'Platform sizes: Instagram, Facebook, LinkedIn, YouTube, WhatsApp Status', 'Export PNG, JPG and PDF'],
         keywords: ['canvas', 'editor', 'create'],
@@ -60,7 +58,6 @@ export const NAV: NavSection[] = [
       {
         label: 'AI Poster Generator',
         href: '/studio/posters',
-        phase: 5,
         description: 'Sale, festival, event and product posters in Malayalam, English, Arabic and more.',
         features: ['Festival & offer templates (Onam, Eid, Diwali…)', 'Multi-language text rendered as live, editable layers', 'Brand kit applied automatically'],
       },
@@ -82,14 +79,12 @@ export const NAV: NavSection[] = [
       {
         label: 'Templates',
         href: '/studio/templates',
-        phase: 5,
         description: 'Ready-made designs by industry and occasion.',
-        features: ['Industry and festival collections', 'Organization templates', 'One-click resize per platform'],
+        features: ['Organization templates by category', 'Start a new design from any template'],
       },
       {
         label: 'Brand Kit',
         href: '/studio/brand-kit',
-        phase: 5,
         description: 'Logo, colours, fonts and guidelines applied to every design.',
         features: ['Multiple brands per organization', 'Colours, fonts, tagline, contact details', 'Brand guidelines for AI generation'],
       },

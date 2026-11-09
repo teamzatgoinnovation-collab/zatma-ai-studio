@@ -130,24 +130,33 @@ interface PaymentProvider {
 Razorpay comes first (INR, UPI, India). Stripe follows for GCC and international. Webhooks are
 the source of truth for subscription state.
 
-## 8. AI Design Studio: layered composition (Phase 5)
+## 8. AI Design Studio: layered composition (implemented in Phase 5)
 
 Image models are poor at rendering exact text, especially Malayalam and Arabic. So a design is
-stored as a **layer document** (JSON) that is rendered with Konva/Fabric:
+stored as a **layer document** (JSON, validated by `designDocumentSchema`) and rendered in the
+browser with Konva:
 
 ```
 Canvas (preset size + safe areas)
-├── background   (AI image or solid/gradient)
-├── decorative   (shapes, overlays)
-├── product      (uploaded or AI image)
-├── logo         (from Brand Kit)
-├── headline     (live text: font, color, script-aware)
-├── description  (live text)
-├── cta          (live text + shape)
-└── footer       (contact, WhatsApp, website)
+├── background   (AI image with overlay, gradient or colour)
+├── logo         (image layer, from the Brand Kit)
+├── badge        (text with pill)
+├── headline     (live text: font, colour, script-aware)
+├── subheadline / body (live text)
+├── cta          (live text with pill)
+├── product      (uploaded image layers)
+└── footer       (website · phone · WhatsApp)
 ```
-The AI produces a *design brief*, the *copy* and a *background image*. A composition engine
-then lays them out according to the brand kit and template rules. All text stays editable.
+
+Pipeline (`DesignService.startGeneration` → `design-generation` queue → `DesignGenerationService.run`):
+1. **Brief:** the text chain returns JSON (copy, layout, palette, background prompt). It is validated with Zod; one repair retry is allowed.
+2. **Background:** the image chain is asked for a text-free image. Any failure falls back to a brand gradient.
+3. **Compose:** `composeDesign()` is pure and deterministic. It picks a layout (`hero-center`, `split-left`, `bottom-band`, `story-stack`) from the brief and aspect ratio, sizes text by length and script width, keeps everything in the safe area, and applies the brand kit.
+4. **Save:** the design becomes `READY` with revision 1, and version 1 is recorded.
+
+Editing is client-side (a pure reducer with undo/redo history). Saves are `PATCH`es carrying the
+last-seen `revision` (optimistic concurrency). Images are always referenced by stored-file id;
+the API resolves them to short-lived signed URLs, which the canvas loads with CORS so export is not tainted.
 
 ## 9. Tooling versions
 

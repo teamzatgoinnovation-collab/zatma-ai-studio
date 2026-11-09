@@ -16,8 +16,10 @@ describe('navigation config', () => {
   });
 
   it('marks live modules without a phase and planned ones with one', () => {
-    for (const id of ['dashboard', 'team', 'billing', 'settings']) expect(NAV.find((s) => s.id === id)!.phase).toBeUndefined();
-    for (const e of allNavEntries().filter((e) => !['/dashboard', '/team', '/billing', '/settings'].includes(e.href))) {
+    const live = ['/dashboard', '/studio', '/studio/design', '/studio/posters', '/studio/templates', '/studio/brand-kit', '/team', '/billing', '/settings'];
+    for (const href of live) expect(findNavEntry(href), href).toBeTruthy();
+    for (const e of allNavEntries().filter((e) => live.includes(e.href))) expect(e.phase, e.href).toBeUndefined();
+    for (const e of allNavEntries().filter((e) => !live.includes(e.href))) {
       expect(e.phase, e.href).toBeGreaterThanOrEqual(3);
     }
   });
