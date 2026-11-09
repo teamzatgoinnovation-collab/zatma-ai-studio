@@ -1,0 +1,17 @@
+{
+  "name": "@zatma/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": ["tsconfig.base.json", "tsconfig.library.json", "eslint.base.js"],
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsconfig.library.json": "./tsconfig.library.json",
+    "./eslint": "./eslint.base.js"
+  },
+  "dependencies": {
+    "@eslint/js": "10.0.1",
+    "typescript-eslint": "8.72.1",
+    "globals": "17.14.0"
+  }
+}
