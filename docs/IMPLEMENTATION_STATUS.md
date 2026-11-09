@@ -5,8 +5,8 @@
 | 0 | Project planning & documentation | ✅ Completed |
 | 1 | Foundation & architecture | ✅ Completed |
 | 2 | Authentication, organizations & SaaS billing | ✅ Completed |
-| 3 | Modern SaaS UI/UX | ✅ Completed (awaiting approval for Phase 4) |
-| 4 | AI provider integration | ⏳ Pending |
+| 3 | Modern SaaS UI/UX | ✅ Completed |
+| 4 | AI provider integration | ✅ Completed (awaiting approval for Phase 5) |
 | 5 | AI Design Studio | ⏳ Pending |
 | 6 | AI Copywriter | ⏳ Pending |
 | 7 | CRM core | ⏳ Pending |
@@ -239,3 +239,71 @@ The axe checks ran on: sign-in, dashboard (light and dark), command palette, mod
 * queued generation jobs
 * token, cost and credit metering against plan limits
 * usage logging
+
+## Phase 4: AI provider integration (✅ Completed)
+
+### Features implemented
+* **Provider adapters** (official SDKs, each enabled only when its key is set):
+  * **Anthropic** text, `claude-opus-5-5`: effort `medium`, server-side refusal fallback, no sampling parameters.
+  * **OpenAI** text, `gpt-6.1-sol` through the Responses API (JSON mode supported), and images, `gpt-image-2` (base64 PNG, priced by tokens).
+  * **Gemini** text, `gemini-3.8-flash`, and images, `gemini-3.1-flash-image` (aspect ratio mapped from the canvas, priced per image).
+  * All models are configurable through env vars.
+* **Fallback and selection:**
+  * Default order: text anthropic → openai → gemini, images openai → gemini.
+  * An organization can choose a preferred provider (`PATCH /ai/settings`), and a single request can override it.
+  * Retryable failures (rate limit, outage, refusal, empty output, auth) fall through to the next provider. Invalid requests stop the chain.
+* **Metering:**
+  * Every attempt writes `ai_usage`: tokens, cost in µUSD, credits, latency, error kind and purpose.
+  * Credits are checked against the plan before each call.
+  * `GET /ai/usage` shows usage by provider without revealing cost.
+* **Queue:** a `generation_job` table plus the BullMQ `ai-generation` queue. Each job runs in its tenant's context. Generated images are stored privately and returned as signed URLs.
+* **Languages:** generation supports English, Malayalam, Arabic, Hindi, Tamil, Kannada and Telugu, with native-script instructions.
+* **Web:**
+  * New **Settings → AI** tab: provider status and models, preferred providers with the effective order, a credits meter with a per-provider breakdown, and a "Try it" playground with language choice that shows the provider, model, credits and any fallback.
+  * The dashboard and command palette link to it.
+
+### Database changes
+Migration `20261109033914_phase4_ai`:
+* New `generation_job` table.
+* `ai_usage`: added `purpose`, `jobId`, `errorKind` and `latencyMs`.
+* `organization`: added `aiSettings`.
+* `GenerationJob` is a tenant-scoped model.
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| API unit tests (adapters with fake SDK clients, pricing, error mapping, instructions) | ✅ 32 passed (13 new) |
+| API e2e tests (11 files) | ✅ 62 passed (10 new AI) |
+| Web unit tests | ✅ 24 passed |
+| Lint, typecheck, build | ✅ |
+
+The adapter unit tests verify the exact request parameters for each provider and that a refusal becomes a retryable error.
+
+The 10 new AI e2e tests cover:
+* no providers configured → 503
+* fallback with per-attempt metering
+* organization and per-request preference
+* a non-retryable error stopping the chain
+* all providers refusing
+* an image job through the queue to private storage with signed URLs
+* a failed job reporting a safe error
+* input validation
+* the plan credit limit (402)
+* permissions (Viewer and Designer) and tenant isolation of jobs and usage
+
+**Browser run against the real SDK clients:** the Anthropic and OpenAI SDKs were pointed at a local HTTP stand-in through `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL`.
+* Anthropic received exactly: `claude-opus-5-5`, `output_config.effort=medium`, `fallbacks:"default"` with the `server-side-fallback-2026-07-01` beta, no `temperature`, and the Malayalam instruction.
+* OpenAI images received `gpt-image-2`, `1024x1024`, PNG.
+* The image was stored in S3 (moto), and the signed URL downloaded with a 200.
+* axe found no serious or critical violations on the AI tab, and there were no console errors.
+
+### Remaining issues / notes
+* **Not called against real provider APIs.** No keys yet; requests follow each SDK's documented types and were checked against a local stand-in. Add `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and/or `GEMINI_API_KEY` to enable them.
+* **Model IDs and prices** were taken from the providers' pricing pages in November 2026. Review `apps/api/src/ai/ai-pricing.ts` when providers change prices. Gemini Flash and Gemini 4 Argon prices are scheduled to rise on 1 Jan 2027 and 1 Dec 2026.
+* **Video generation** (Phase 16) and **platform-level provider management** (Phase 19, Super Admin) are out of scope here.
+
+### Next phase
+**Phase 5: AI Design Studio.**
+* Prompt → design brief → copy → background image → layered editable design.
+* Canvas editor (Konva/Fabric) with platform size presets.
+* Brand Kit, and export to PNG, JPG and PDF.

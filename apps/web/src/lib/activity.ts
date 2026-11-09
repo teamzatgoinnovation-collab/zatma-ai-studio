@@ -17,6 +17,7 @@ const LABELS: Record<string, string> = {
   'billing.checkout_started': 'started a plan checkout',
   'billing.plan_changed': 'changed the plan',
   'billing.canceled': 'canceled the subscription',
+  'ai.settings_updated': 'changed AI provider preferences',
 };
 
 /** Human-readable sentence for an audit action code (falls back to the code itself). */

@@ -20,6 +20,9 @@ export class MemoryObjectStorage implements ObjectStorage {
   async presignGet(key: string) {
     return `https://storage.test/${key}?X-Amz-Signature=get`;
   }
+  async putObject(key: string, body: Buffer, contentType: string) {
+    this.objects.set(key, { sizeBytes: body.length, contentType });
+  }
   async head(key: string) {
     return this.objects.get(key) ?? null;
   }

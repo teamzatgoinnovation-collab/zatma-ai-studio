@@ -1,5 +1,9 @@
 import type {
   AIProviderInfo,
+  AISettings,
+  AIUsageSummary,
+  GenerationJobSummary,
+  TextGenerationResponse,
   AuthProviders,
   CheckoutSession,
   InvitationSummary,
@@ -20,7 +24,10 @@ import type {
   Workspace,
 } from '@zatma/types';
 import type {
+  AISettingsInput,
   ChangePlanInput,
+  CreateGenerationJobInput,
+  GenerateTextInput,
   CheckoutInput,
   CreateWorkspaceInput,
   PresignUploadInput,
@@ -128,6 +135,13 @@ export function createApiClient(options: ApiClientOptions) {
     },
     ai: {
       providers: () => request<AIProviderInfo[]>('GET', '/ai/providers'),
+      settings: () => request<AISettings>('GET', '/ai/settings'),
+      updateSettings: (input: AISettingsInput) => request<AISettings>('PATCH', '/ai/settings', input),
+      generateText: (input: Partial<GenerateTextInput> & Pick<GenerateTextInput, 'prompt'>) => request<TextGenerationResponse>('POST', '/ai/text', input),
+      createJob: (input: CreateGenerationJobInput) => request<GenerationJobSummary>('POST', '/ai/jobs', input),
+      job: (id: string) => request<GenerationJobSummary>('GET', `/ai/jobs/${encodeURIComponent(id)}`),
+      jobs: (query?: { page?: number; pageSize?: number }) => request<Paginated<GenerationJobSummary>>('GET', '/ai/jobs', undefined, query),
+      usage: () => request<AIUsageSummary>('GET', '/ai/usage'),
     },
   };
 }

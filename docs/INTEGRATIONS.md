@@ -9,9 +9,9 @@ presented as connected.
 | **Better Auth + Google OAuth** | Sign-in with Google | 1–2 | Google Cloud OAuth client (`GOOGLE_CLIENT_ID/SECRET`), consent screen, redirect URI `${WEB_URL}/api/auth/callback/google` | Implemented; button appears automatically once credentials are set |
 | **Razorpay** | Subscriptions (INR, UPI, cards) | 2 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, KYC-activated account, plans created | **Implemented** (checkout, plan change, cancel, webhooks). Live checkout disabled until keys and plan ids are set |
 | **Stripe** | Subscriptions for GCC / international | later | `STRIPE_SECRET_KEY`, webhook secret | Pending |
-| **OpenAI** | Text + image generation | 4 | `OPENAI_API_KEY` | Pending (interface in P1) |
-| **Anthropic** | Text generation | 4 | `ANTHROPIC_API_KEY` | Pending (interface in P1) |
-| **Google Gemini** | Text + image generation | 4 | `GEMINI_API_KEY` | Pending (interface in P1) |
+| **OpenAI** | Text (Responses API) + image generation (`gpt-image-2`) | 4 | `OPENAI_API_KEY` (optional `OPENAI_TEXT_MODEL`, `OPENAI_IMAGE_MODEL`) | **Implemented**; enabled when the key is set |
+| **Anthropic** | Text generation (`claude-opus-5-5`, server-side refusal fallback) | 4 | `ANTHROPIC_API_KEY` (optional `ANTHROPIC_TEXT_MODEL`, `ANTHROPIC_EFFORT`) | **Implemented**; enabled when the key is set |
+| **Google Gemini** | Text (`gemini-3.8-flash`) + image (`gemini-3.1-flash-image`) generation | 4 | `GEMINI_API_KEY` (optional `GEMINI_TEXT_MODEL`, `GEMINI_IMAGE_MODEL`) | **Implemented**; enabled when the key is set |
 | **Video provider(s)** | Text/image to video | 16 | Vendor key (TBD) | Pending |
 | **S3-compatible storage** | Assets, exports | 1 | `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET` (moto S3 emulator in dev, Cloudflare R2 in prod; bucket CORS must allow PUT from the web origin) | Implemented (presigned upload, completion check, signed downloads) |
 | **Meta Graph API: Pages** | Facebook Page publishing, insights | 9–10 | Meta App, Business verification, App Review: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts` | Pending |

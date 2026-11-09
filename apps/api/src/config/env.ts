@@ -38,6 +38,16 @@ export const envSchema = z
     ANTHROPIC_API_KEY: optional,
     GEMINI_API_KEY: optional,
 
+    // Provider order for fallback (first = default). Organizations can prefer a different first provider.
+    AI_TEXT_PROVIDERS: z.string().default('anthropic,openai,gemini').transform((v) => v.split(',').map((x) => x.trim()).filter(Boolean)),
+    AI_IMAGE_PROVIDERS: z.string().default('openai,gemini').transform((v) => v.split(',').map((x) => x.trim()).filter(Boolean)),
+    ANTHROPIC_TEXT_MODEL: z.string().default('claude-opus-5-5'),
+    ANTHROPIC_EFFORT: z.enum(['low', 'medium', 'high']).default('medium'),
+    OPENAI_TEXT_MODEL: z.string().default('gpt-6.1-sol'),
+    OPENAI_IMAGE_MODEL: z.string().default('gpt-image-2'),
+    GEMINI_TEXT_MODEL: z.string().default('gemini-3.8-flash'),
+    GEMINI_IMAGE_MODEL: z.string().default('gemini-3.1-flash-image'),
+
     RAZORPAY_KEY_ID: optional,
     RAZORPAY_KEY_SECRET: optional,
     RAZORPAY_WEBHOOK_SECRET: optional,

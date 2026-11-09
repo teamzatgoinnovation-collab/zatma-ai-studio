@@ -11,18 +11,24 @@ export interface AIUsage {
 export interface TextGenerationInput {
   system?: string;
   prompt: string;
+  /** Overrides the provider's configured model. */
   model?: string;
   maxOutputTokens?: number;
+  /** 0–1. Ignored by providers that no longer support sampling parameters (current Claude models). */
   temperature?: number;
-  /** BCP-47 / ISO-639-1 language for the output (en, ml, ar, hi, ta, kn, te). */
+  /** ISO-639-1 output language (en, ml, ar, hi, ta, kn, te). Adapters add it to the instructions. */
   language?: string;
   responseFormat?: 'text' | 'json';
+  /** Abort long requests (ms). */
+  timeoutMs?: number;
 }
 
 export interface TextGenerationResult {
   text: string;
+  /** Model that actually produced the output (may differ from the requested one after a server-side fallback). */
   model: string;
   usage: AIUsage;
+  finishReason: 'stop' | 'length' | 'other';
 }
 
 export interface ImageGenerationInput {
@@ -31,11 +37,15 @@ export interface ImageGenerationInput {
   width: number;
   height: number;
   count?: number;
-  negativePrompt?: string;
+}
+
+export interface GeneratedImage {
+  data: Buffer;
+  mimeType: string;
 }
 
 export interface ImageGenerationResult {
-  images: Array<{ data: Buffer; mimeType: string }>;
+  images: GeneratedImage[];
   model: string;
   usage: AIUsage;
 }
@@ -51,14 +61,17 @@ export interface VideoGenerationInput {
 export interface VideoGenerationResult {
   /** Providers are asynchronous: return a provider job id to poll, or the final video. */
   providerJobId?: string;
-  video?: { data: Buffer; mimeType: string };
+  video?: GeneratedImage;
   model: string;
   usage: AIUsage;
 }
 
 interface ProviderBase {
+  /** Provider id: 'anthropic' | 'openai' | 'gemini' | … */
   readonly id: string;
   readonly name: string;
+  /** Model used when the request doesn't name one. */
+  readonly defaultModel: string;
 }
 
 export interface AITextProvider extends ProviderBase {
@@ -69,6 +82,7 @@ export interface AIImageProvider extends ProviderBase {
   generateImage(input: ImageGenerationInput): Promise<ImageGenerationResult>;
 }
 
+/** Implemented in Phase 16 (AI Video Studio). */
 export interface AIVideoProvider extends ProviderBase {
   generateVideo(input: VideoGenerationInput): Promise<VideoGenerationResult>;
 }
@@ -82,9 +96,30 @@ export interface ProviderCatalogEntry {
   envKey: 'OPENAI_API_KEY' | 'ANTHROPIC_API_KEY' | 'GEMINI_API_KEY';
 }
 
-/** Providers we plan to support (Phase 4). Shown to admins with their configuration status. */
 export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
-  { id: 'openai', name: 'OpenAI', capabilities: ['TEXT', 'IMAGE', 'EMBEDDING'], envKey: 'OPENAI_API_KEY' },
   { id: 'anthropic', name: 'Anthropic', capabilities: ['TEXT'], envKey: 'ANTHROPIC_API_KEY' },
-  { id: 'gemini', name: 'Google Gemini', capabilities: ['TEXT', 'IMAGE', 'EMBEDDING'], envKey: 'GEMINI_API_KEY' },
+  { id: 'openai', name: 'OpenAI', capabilities: ['TEXT', 'IMAGE'], envKey: 'OPENAI_API_KEY' },
+  { id: 'gemini', name: 'Google Gemini', capabilities: ['TEXT', 'IMAGE'], envKey: 'GEMINI_API_KEY' },
 ];
+
+export const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  ml: 'Malayalam',
+  ar: 'Arabic',
+  hi: 'Hindi',
+  ta: 'Tamil',
+  kn: 'Kannada',
+  te: 'Telugu',
+};
+
+/** Shared instruction suffix so every provider honours language and JSON requests the same way. */
+export function buildInstructions(input: Pick<TextGenerationInput, 'system' | 'language' | 'responseFormat'>): string | undefined {
+  const parts = [input.system?.trim()].filter(Boolean) as string[];
+  if (input.language && input.language !== 'en') {
+    parts.push(`Write the response in ${LANGUAGE_NAMES[input.language] ?? input.language}, using its native script.`);
+  }
+  if (input.responseFormat === 'json') {
+    parts.push('Respond with a single valid JSON value only: no prose, no markdown code fences.');
+  }
+  return parts.length ? parts.join('\n\n') : undefined;
+}

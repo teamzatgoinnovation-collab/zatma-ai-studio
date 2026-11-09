@@ -111,7 +111,7 @@ describe('Foundation (e2e)', () => {
 
   it('lists AI providers without exposing keys', async () => {
     const res = await api(app, owner).get('/ai/providers').expect(200);
-    expect(res.body.map((p: { id: string }) => p.id)).toEqual(['openai', 'anthropic', 'gemini']);
+    expect(res.body.map((p: { id: string }) => p.id)).toEqual(['anthropic', 'openai', 'gemini']);
     expect(JSON.stringify(res.body)).not.toMatch(/sk-|apiKey/i);
   });
 

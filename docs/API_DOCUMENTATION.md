@@ -102,3 +102,23 @@ New error codes:
 * `INVALID_SIGNATURE` (400)
 * `UPLOAD_MISSING` (409), `UPLOAD_MISMATCH` (422), `INVALID_LOGO` (422)
 * `SOLE_OWNER`, `ACTIVE_SUBSCRIPTION`, `EMAIL_NOT_VERIFIED` (from Better Auth)
+
+## Phase 4 endpoints
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/api/v1/ai/providers` | `ai:read` | Providers, whether active, default models. Keys are never returned |
+| GET | `/api/v1/ai/settings` | `ai:read` | Preferred providers and effective fallback order |
+| PATCH | `/api/v1/ai/settings` | `organization:update` | `{ textProvider?, imageProvider? }` (`null` = platform default) |
+| POST | `/api/v1/ai/text` | `ai:generate` | Synchronous text generation (`prompt`, `system?`, `language?`, `responseFormat?`, `maxOutputTokens ≤ 8000`, `provider?`, `purpose`). Throttled to 20/min |
+| POST | `/api/v1/ai/jobs` | `ai:generate` | Queue `{ type: 'TEXT' \| 'IMAGE', input }`, returning `202` with the job. Throttled to 20/min |
+| GET | `/api/v1/ai/jobs` / `/api/v1/ai/jobs/:id` | `ai:read` | Job status and output. Images come back as 5-minute signed URLs |
+| GET | `/api/v1/ai/usage` | `ai:read` | Credits used and limit this period, a per-provider breakdown, and recent requests |
+
+Error codes:
+* `AI_PROVIDER_UNAVAILABLE` (503): no provider is configured.
+* `AI_PROVIDERS_FAILED` (503): every provider failed.
+* `AI_CONTENT_REFUSED` (422): declined by the safety filters.
+* `AI_REQUEST_REJECTED` (422): the provider rejected the request as invalid.
+* `AI_PROVIDER_NOT_AVAILABLE` (422): the preferred provider isn't configured.
+* `PLAN_LIMIT_REACHED` (402): the plan's AI credits are used up.
