@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, CreditCard, ExternalLink, Loader2, Receipt } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Alert, Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, cn, Meter, Skeleton, Tabs } from '@zatma/ui';
+import { Alert, Badge, Button, ErrorState, PageHeader, Card, CardContent, CardDescription, CardHeader, CardTitle, cn, Meter, Skeleton, Tabs } from '@zatma/ui';
 import type { BillingInterval, PlanSummary, SubscriptionDetail, UsageMetric } from '@zatma/types';
 import { ApiError } from '@zatma/sdk';
 import { api } from '@/lib/api';
@@ -84,13 +84,12 @@ export function BillingPage() {
   });
 
   if (sub.isPending || plans.isPending) return <Skeleton className="h-[600px]" />;
+  if (sub.isError || plans.isError)
+    return <ErrorState description="Couldn't load billing details." onRetry={() => void Promise.all([sub.refetch(), plans.refetch()])} />;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
-        <p className="text-sm text-muted-foreground">Plans, usage and invoices for {org.data?.name}.</p>
-      </div>
+      <PageHeader icon={<CreditCard />} title="Billing" description={`Plans, usage and invoices for ${org.data?.name ?? 'your organization'}.`} />
 
       {s && !s.billingEnabled && (
         <Alert tone="info">
@@ -182,6 +181,7 @@ export function BillingPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Plans</h2>
         <Tabs
+          label="Billing interval"
           items={[
             { id: 'MONTHLY', label: 'Monthly' },
             { id: 'YEARLY', label: 'Yearly · 2 months free' },

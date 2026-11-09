@@ -11,7 +11,7 @@ zatma-ai-studio/
 │   ├── types/               Shared TS types: roles, permissions, API shapes
 │   ├── validation/          Shared Zod schemas (used by web forms and API pipes)
 │   ├── config/              Shared tsconfig / ESLint / Prettier presets
-│   ├── ui/                  Shared React UI primitives (shadcn/ui style)
+│   ├── ui/                  Shared React UI primitives (Radix + cmdk, see DESIGN_SYSTEM.md)
 │   └── sdk/                 Typed API client consumed by web
 ├── infrastructure/
 │   └── docker/              docker-compose (Postgres, Redis, S3 emulator) + Dockerfiles

@@ -3,9 +3,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Activity, Bot, Building2, CheckCircle2, CreditCard, Database, Layers, Server, Users, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Alert, Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Skeleton } from '@zatma/ui';
+import { Badge, Card, ErrorState, PageHeader, CardContent, CardDescription, CardHeader, CardTitle, Skeleton } from '@zatma/ui';
 import { ROLE_LABELS } from '@zatma/types';
+import Link from 'next/link';
 import { api } from '@/lib/api';
+import { describeActivity } from '@/lib/activity';
 import { WorkspacesCard } from './workspaces-card';
 
 const formatDate = (iso: string) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
@@ -43,14 +45,14 @@ export function Dashboard() {
   const canReadAudit = org.data?.permissions.includes('audit:read') ?? false;
   const audit = useQuery({ queryKey: ['audit-logs'], queryFn: () => api.auditLogs.list({ pageSize: 8 }), enabled: canReadAudit });
 
-  if (org.isError) return <Alert>Could not load your organization: {org.error.message}</Alert>;
+  if (org.isError) return <ErrorState description={org.error.message} onRetry={() => void org.refetch()} />;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Foundation overview for your organization.</p>
-      </div>
+      <PageHeader
+        title={org.data ? `Welcome to ${org.data.name}` : 'Dashboard'}
+        description="Your organization at a glance. Modules light up here as each phase ships."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -119,7 +121,11 @@ export function Dashboard() {
             <CardTitle className="flex items-center gap-2">
               <Users className="size-4 text-primary" aria-hidden="true" /> Team
             </CardTitle>
-            <CardDescription>Invitations arrive in Phase 2.</CardDescription>
+            <CardDescription>
+              <Link href="/team" className="font-medium text-primary hover:underline">
+                Manage team &amp; invitations
+              </Link>
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {members.isPending && <Skeleton className="h-10" />}
@@ -138,7 +144,7 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="xl:col-span-2">
+        <Card className="scroll-mt-24 xl:col-span-2" id="activity">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="size-4 text-primary" aria-hidden="true" /> Recent activity
@@ -154,8 +160,7 @@ export function Dashboard() {
                 <li key={entry.id} className="flex items-center gap-3 py-2.5 text-sm">
                   <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <span className="flex-1">
-                    <span className="font-medium">{entry.actorName ?? 'System'}</span>{' '}
-                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{entry.action}</code>
+                    {describeActivity(entry)}
                   </span>
                   <time className="text-xs text-muted-foreground" dateTime={entry.createdAt}>
                     {formatDate(entry.createdAt)}

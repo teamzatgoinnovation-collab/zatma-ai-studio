@@ -1,7 +1,8 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Tabs } from '@zatma/ui';
+import { PageHeader, Tabs } from '@zatma/ui';
+import { Settings } from 'lucide-react';
 import { AccountSettings } from './account-settings';
 import { OrganizationSettings } from './organization-settings';
 
@@ -18,11 +19,8 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your organization profile and your personal account.</p>
-      </div>
-      <Tabs items={TABS} value={tab} onChange={(id) => router.replace(`${pathname}?tab=${id}`)} />
+      <PageHeader icon={<Settings />} title="Settings" description="Manage your organization profile and your personal account." />
+      <Tabs label="Settings sections" withPanels items={TABS} value={tab} onChange={(id) => router.replace(`${pathname}?tab=${id}`)} />
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === 'organization' ? <OrganizationSettings /> : <AccountSettings />}
       </div>

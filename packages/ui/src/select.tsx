@@ -51,9 +51,24 @@ export interface TabItem {
 }
 
 /** Simple accessible tab list; content is rendered by the caller based on `value`. */
-export function Tabs({ items, value, onChange, className }: { items: TabItem[]; value: string; onChange: (id: string) => void; className?: string }) {
+/** Pass `withPanels` when the caller renders `role="tabpanel"` elements with id `panel-<id>`. */
+export function Tabs({
+  items,
+  value,
+  onChange,
+  className,
+  label,
+  withPanels = false,
+}: {
+  items: TabItem[];
+  value: string;
+  onChange: (id: string) => void;
+  className?: string;
+  label?: string;
+  withPanels?: boolean;
+}) {
   return (
-    <div role="tablist" className={cn('inline-flex rounded-xl border border-border bg-muted p-1', className)}>
+    <div role="tablist" aria-label={label} className={cn('inline-flex rounded-xl border border-border bg-muted p-1', className)}>
       {items.map((t) => (
         <button
           key={t.id}
@@ -61,7 +76,7 @@ export function Tabs({ items, value, onChange, className }: { items: TabItem[]; 
           role="tab"
           id={`tab-${t.id}`}
           aria-selected={value === t.id}
-          aria-controls={`panel-${t.id}`}
+          aria-controls={withPanels ? `panel-${t.id}` : undefined}
           onClick={() => onChange(t.id)}
           className={cn(
             'rounded-lg px-4 py-1.5 text-sm font-medium transition-colors',

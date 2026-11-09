@@ -12,24 +12,230 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-export interface NavItem {
+export interface NavLeaf {
   label: string;
   href: string;
-  icon: LucideIcon;
-  /** Phase in which the module ships; omitted for items that are live. */
+  /** Roadmap phase in which this module ships; omitted when it is live. */
   phase?: number;
+  /** One-line purpose, shown in module pages and the command palette. */
+  description: string;
+  /** Planned capabilities (from the product spec), shown on not-yet-built module pages. */
+  features?: string[];
+  keywords?: string[];
 }
 
-/** Full product navigation. Items with a `phase` are shown as upcoming and are not clickable. */
-export const NAV: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'AI Studio', href: '/studio', icon: Palette, phase: 5 },
-  { label: 'CRM', href: '/crm', icon: Users, phase: 7 },
-  { label: 'Marketing', href: '/marketing', icon: Megaphone, phase: 10 },
-  { label: 'Advertising', href: '/ads', icon: Target, phase: 11 },
-  { label: 'Analytics', href: '/analytics', icon: BarChart3, phase: 17 },
-  { label: 'AI Assistant', href: '/assistant', icon: Bot, phase: 6 },
-  { label: 'Team', href: '/team', icon: Building2 },
-  { label: 'Billing', href: '/billing', icon: CreditCard },
-  { label: 'Settings', href: '/settings', icon: Settings },
+export interface NavSection extends Omit<NavLeaf, 'href'> {
+  id: string;
+  icon: LucideIcon;
+  /** Landing route for the section (its overview, or the page itself when there are no children). */
+  href: string;
+  children?: NavLeaf[];
+}
+
+/** Single source of truth for the sidebar, breadcrumbs, command palette and module pages. */
+export const NAV: NavSection[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    description: 'Overview of your organization, workspaces and activity.',
+  },
+  {
+    id: 'studio',
+    label: 'AI Studio',
+    href: '/studio',
+    icon: Palette,
+    phase: 5,
+    description: 'Create marketing designs, copy and videos from a text prompt.',
+    children: [
+      {
+        label: 'AI Design Generator',
+        href: '/studio/design',
+        phase: 5,
+        description: 'Turn a prompt into an editable, on-brand marketing design.',
+        features: ['Prompt → design brief → copy → background → layered design', 'Editable text, fonts, colours, images and layout', 'Platform sizes: Instagram, Facebook, LinkedIn, YouTube, WhatsApp Status', 'Export PNG, JPG and PDF'],
+        keywords: ['canvas', 'editor', 'create'],
+      },
+      {
+        label: 'AI Poster Generator',
+        href: '/studio/posters',
+        phase: 5,
+        description: 'Sale, festival, event and product posters in Malayalam, English, Arabic and more.',
+        features: ['Festival & offer templates (Onam, Eid, Diwali…)', 'Multi-language text rendered as live, editable layers', 'Brand kit applied automatically'],
+      },
+      {
+        label: 'AI Video Studio',
+        href: '/studio/video',
+        phase: 16,
+        description: 'Promotional and social video ads from a script or prompt.',
+        features: ['Script and storyboard generation', 'Scene rendering via video providers', 'Voice-over, subtitles and music', 'MP4 export'],
+      },
+      {
+        label: 'AI Copywriter',
+        href: '/studio/copywriter',
+        phase: 6,
+        description: 'Headlines, captions, hashtags and ad copy in seven languages.',
+        features: ['Tone, audience, goal and platform controls', 'Variants, regeneration and translation', 'Save as template or link to a campaign'],
+        keywords: ['captions', 'hashtags', 'text'],
+      },
+      {
+        label: 'Templates',
+        href: '/studio/templates',
+        phase: 5,
+        description: 'Ready-made designs by industry and occasion.',
+        features: ['Industry and festival collections', 'Organization templates', 'One-click resize per platform'],
+      },
+      {
+        label: 'Brand Kit',
+        href: '/studio/brand-kit',
+        phase: 5,
+        description: 'Logo, colours, fonts and guidelines applied to every design.',
+        features: ['Multiple brands per organization', 'Colours, fonts, tagline, contact details', 'Brand guidelines for AI generation'],
+      },
+    ],
+  },
+  {
+    id: 'crm',
+    label: 'CRM',
+    href: '/crm',
+    icon: Users,
+    phase: 7,
+    description: 'Leads, contacts, companies, deals and follow-ups in one place.',
+    features: ['Lead, customer and revenue metrics', 'Lead sources and conversion', 'Follow-ups due today'],
+    children: [
+      { label: 'Leads', href: '/crm/leads', phase: 7, description: 'Capture, score, assign and convert leads.', features: ['Import/export CSV', 'Duplicate detection & merge', 'AI lead scoring (Phase 8)', 'Assignment and status tracking'] },
+      { label: 'Contacts', href: '/crm/contacts', phase: 7, description: 'People you work with, with full activity history.', features: ['Linked company, leads and deals', 'Custom fields and tags', 'Communication history'] },
+      { label: 'Companies', href: '/crm/companies', phase: 7, description: 'Business accounts and their contacts and deals.', features: ['Company profiles', 'Associated contacts and deals'] },
+      { label: 'Customers', href: '/crm/customers', phase: 7, description: 'Converted customers, lifecycle and segmentation.', features: ['Customer lifecycle', 'Segments for campaigns', 'Retention signals'] },
+      { label: 'Deals', href: '/crm/deals', phase: 7, description: 'Opportunities with value, stage and probability.', features: ['Deal value and currency', 'Expected close date and probability', 'Owner and source'] },
+      { label: 'Sales Pipeline', href: '/crm/pipeline', phase: 7, description: 'Drag-and-drop Kanban from New Lead to Won.', features: ['Configurable stages', 'Drag-and-drop between stages', 'Pipeline value by stage'], keywords: ['kanban'] },
+      { label: 'Activities', href: '/crm/activities', phase: 7, description: 'Calls, emails, meetings, WhatsApp messages and notes.', features: ['Timeline on every record', 'Activity types and outcomes'] },
+      { label: 'Follow-ups', href: '/crm/follow-ups', phase: 7, description: 'Reminders with AI-drafted follow-up messages.', features: ['Due dates, priority and owner', 'Calendar integration', 'AI-generated follow-up message'] },
+    ],
+  },
+  {
+    id: 'marketing',
+    label: 'Marketing',
+    href: '/marketing',
+    icon: Megaphone,
+    phase: 10,
+    description: 'Campaigns, social publishing, calendar, email, WhatsApp and automation.',
+    children: [
+      { label: 'Campaigns', href: '/marketing/campaigns', phase: 12, description: 'Plan and run multi-channel campaigns.', features: ['Campaign types, budget and audience', 'Assets and schedule', 'Leads and conversion tracking'] },
+      { label: 'Social Media', href: '/marketing/social', phase: 10, description: 'Compose, preview and publish to connected accounts.', features: ['Facebook, Instagram, LinkedIn, YouTube, TikTok, Pinterest', 'Platform-specific previews and validation', 'Publishing status and retries'] },
+      { label: 'Content Calendar', href: '/marketing/calendar', phase: 10, description: 'Month, week, day and list views of scheduled content.', features: ['Time-zone aware scheduling', 'Drag to reschedule'] },
+      { label: 'Email Marketing', href: '/marketing/email', phase: 14, description: 'Templates, segments and email campaigns.', features: ['Personalisation and scheduling', 'Bounce and unsubscribe handling', 'Delivery analytics'] },
+      { label: 'WhatsApp Marketing', href: '/marketing/whatsapp', phase: 14, description: 'Template messages via the WhatsApp Business Platform.', features: ['Opt-in and consent tracking', 'Approved templates', 'Message status and CRM sync'] },
+      { label: 'Automation', href: '/marketing/automation', phase: 13, description: 'Visual trigger → condition → action workflows.', features: ['New lead, status change, inactivity triggers', 'Assign, notify, message, tag actions', 'Execution logs and loop prevention'], keywords: ['workflow'] },
+    ],
+  },
+  {
+    id: 'advertising',
+    label: 'Advertising',
+    href: '/ads',
+    icon: Target,
+    phase: 11,
+    description: 'Create and track paid campaigns on Meta and Google.',
+    children: [
+      { label: 'Meta Ads', href: '/ads/meta', phase: 11, description: 'Facebook and Instagram ad accounts, campaigns, ad sets and ads.', features: ['AI campaign builder', 'Budget and audience configuration', 'Explicit approval before any spend'] },
+      { label: 'Google Ads', href: '/ads/google', phase: 11, description: 'Search, display and video campaigns.', features: ['Account connection', 'Campaign performance', 'Lead import'] },
+      { label: 'Ad Campaigns', href: '/ads/campaigns', phase: 11, description: 'All paid campaigns across platforms.', features: ['Pause and resume', 'Budget pacing'] },
+      { label: 'Ad Analytics', href: '/ads/analytics', phase: 17, description: 'Spend, reach, CTR, CPL and ROAS.', features: ['Creative and audience performance', 'Cross-platform comparison'] },
+    ],
+  },
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    href: '/analytics',
+    icon: BarChart3,
+    phase: 17,
+    description: 'Marketing, CRM and sales performance with AI insights.',
+    children: [
+      { label: 'Marketing Analytics', href: '/analytics/marketing', phase: 17, description: 'Reach, engagement, clicks and leads by channel.' },
+      { label: 'CRM Analytics', href: '/analytics/crm', phase: 17, description: 'Lead sources, conversion and pipeline value.' },
+      { label: 'Sales Analytics', href: '/analytics/sales', phase: 17, description: 'Won/lost deals, cycle length and team performance.' },
+      { label: 'AI Insights', href: '/analytics/insights', phase: 17, description: 'Ask questions about your performance in plain language.' },
+    ],
+  },
+  {
+    id: 'assistant',
+    label: 'AI Assistant',
+    href: '/assistant',
+    icon: Bot,
+    phase: 6,
+    description: 'Chat with AI to plan campaigns, write copy and work your CRM.',
+    features: ['"Which leads should I contact today?"', '"Create a WhatsApp follow-up for this lead"', '"Plan an Onam campaign for my supermarket"'],
+  },
+  {
+    id: 'team',
+    label: 'Team',
+    href: '/team',
+    icon: Building2,
+    description: 'Members, roles and invitations.',
+    keywords: ['members', 'invite', 'roles'],
+  },
+  {
+    id: 'billing',
+    label: 'Billing',
+    href: '/billing',
+    icon: CreditCard,
+    description: 'Plan, usage limits and invoices.',
+    keywords: ['subscription', 'plan', 'invoice', 'razorpay'],
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    href: '/settings',
+    icon: Settings,
+    description: 'Organization profile and your account.',
+    keywords: ['profile', 'password', 'logo'],
+  },
 ];
+
+/** Top-level groups rendered with a divider before them in the sidebar. */
+export const NAV_DIVIDERS = new Set(['team']);
+
+export interface Crumb {
+  label: string;
+  href: string;
+}
+
+const matches = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+/** Breadcrumb trail for a pathname, derived from NAV. */
+export function breadcrumbsFor(pathname: string): Crumb[] {
+  for (const section of NAV) {
+    if (!matches(pathname, section.href) && !section.children?.some((c) => matches(pathname, c.href))) continue;
+    const trail: Crumb[] = [{ label: section.label, href: section.href }];
+    const child = section.children?.find((c) => matches(pathname, c.href));
+    if (child && child.href !== section.href) trail.push({ label: child.label, href: child.href });
+    return trail;
+  }
+  return [];
+}
+
+/** Looks up a module page by exact href (sections and leaves). */
+export function findNavEntry(pathname: string): { section: NavSection; leaf?: NavLeaf } | null {
+  for (const section of NAV) {
+    if (section.href === pathname) return { section };
+    const leaf = section.children?.find((c) => c.href === pathname);
+    if (leaf) return { section, leaf };
+  }
+  return null;
+}
+
+/** The section whose subtree contains the pathname (used to auto-expand sidebar groups). */
+export function activeSectionId(pathname: string): string | null {
+  return NAV.find((s) => matches(pathname, s.href) || s.children?.some((c) => matches(pathname, c.href)))?.id ?? null;
+}
+
+/** Flattened list of every navigable entry (command palette). */
+export function allNavEntries(): Array<NavLeaf & { section: string; icon: LucideIcon }> {
+  return NAV.flatMap((s) => [
+    { label: s.label, href: s.href, phase: s.phase, description: s.description, keywords: s.keywords, section: s.label, icon: s.icon },
+    ...(s.children ?? []).map((c) => ({ ...c, section: s.label, icon: s.icon })),
+  ]);
+}
+
+export { matches as isActiveHref };

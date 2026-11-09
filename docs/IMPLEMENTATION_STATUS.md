@@ -4,8 +4,8 @@
 |---|---|---|
 | 0 | Project planning & documentation | ✅ Completed |
 | 1 | Foundation & architecture | ✅ Completed |
-| 2 | Authentication, organizations & SaaS billing | ✅ Completed (awaiting approval for Phase 3) |
-| 3 | Modern SaaS UI/UX | ⏳ Pending |
+| 2 | Authentication, organizations & SaaS billing | ✅ Completed |
+| 3 | Modern SaaS UI/UX | ✅ Completed (awaiting approval for Phase 4) |
 | 4 | AI provider integration | ⏳ Pending |
 | 5 | AI Design Studio | ⏳ Pending |
 | 6 | AI Copywriter | ⏳ Pending |
@@ -180,3 +180,62 @@ The only console error is the intentional 403 from the unverified sign-in attemp
 * collapsible sidebar groups for every module
 * consistent loading, empty and error states
 * an accessibility pass and responsive polish
+
+## Phase 3: Modern SaaS UI/UX (✅ Completed)
+
+### Features implemented
+* **Design system** (see [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)):
+  * Tokens for light and dark themes, including contrast-safe status text colours.
+  * Radix-based `Dialog`, `Sheet`, `DropdownMenu` and `Tooltip`, plus a cmdk `Command` palette.
+  * `PageHeader`, `EmptyState`, `ErrorState`, `Spinner`, `Meter` and `Kbd`.
+* **App shell:**
+  * Nested sidebar matching the full module tree (AI Studio, CRM, Marketing, Advertising, Analytics, AI Assistant, Team, Billing, Settings). Groups open automatically for the current page, and planned modules carry phase badges.
+  * The sidebar collapses to icons with tooltips, and that choice persists in a cookie so the server renders it without flicker.
+  * Org switcher in the sidebar (top bar on mobile), and an off-canvas mobile navigation.
+  * Top bar: breadcrumbs, ⌘K / Ctrl K search, activity bell (organization audit trail with unread badge), and a user menu with theme switching and sign-out.
+  * Command palette covering every page, quick actions, theme switching and organization switching.
+  * Skip link, landmarks, visible focus rings and reduced-motion support.
+* **Module layouts:**
+  * Every sidebar entry resolves to a page. Section overviews show a card per module.
+  * Modules that haven't shipped show their purpose, their planned capabilities from the spec, and related features available now.
+  * No mock or sample data anywhere. Unknown module paths return 404.
+* **Page states:**
+  * Route-level `loading`, `error` and `not-found`, plus `global-error`.
+  * Existing pages (Dashboard, Team, Billing, Settings) use the shared page header and error states.
+  * The dashboard's activity feed uses human-readable sentences.
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Lint and typecheck, all packages | ✅ |
+| Web unit and component tests (Vitest + Testing Library) | ✅ 24 passed (navigation config, breadcrumbs, sidebar behaviour, module pages, state components, activity helpers, redirect safety, palette shortcut) |
+| Existing unit tests | ✅ 33 passed |
+| Existing API e2e tests | ✅ 52 passed |
+| Production build | ✅ |
+| Browser checks (Playwright) | ✅ no console errors |
+| Accessibility (axe, WCAG 2.1 AA) | ✅ 0 serious or critical violations |
+
+The browser checks covered:
+* skip link focus order
+* activity bell: unread badge, then cleared
+* ⌘K search → navigation
+* breadcrumbs, and auto-expanded sidebar groups
+* section overview
+* collapsing the sidebar and keeping that state after a reload
+* the 404 page
+* switching to dark theme from the user menu
+* mobile navigation sheet, with no horizontal overflow
+
+The axe checks ran on: sign-in, dashboard (light and dark), command palette, module page, section overview, Team, Billing, Settings and Account.
+
+### Remaining notes
+* The activity bell shows the audit trail. Real notifications (assignments, follow-ups due, campaign results) arrive in Phase 18.
+* Not every Phase 3 page has to exist yet: module pages for future phases are roadmap layouts by design. Each is replaced by the real module in its phase.
+
+### Next phase
+**Phase 4: AI provider integration.** It covers:
+* OpenAI, Anthropic and Gemini adapters behind the existing interfaces
+* model selection and fallback
+* queued generation jobs
+* token, cost and credit metering against plan limits
+* usage logging
