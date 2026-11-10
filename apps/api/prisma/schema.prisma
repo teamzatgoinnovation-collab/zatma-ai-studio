@@ -112,6 +112,8 @@ model Organization {
   currency        String   @default("INR")
   /// { textProvider?: string, imageProvider?: string } — preferred AI providers (null = platform default order)
   aiSettings      Json?
+  /// CRM settings, e.g. { scoring: ScoringSettings }
+  crmSettings     Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt
 
@@ -754,9 +756,15 @@ model Lead {
   tags               String[]   @default([])
   customFields       Json       @default("{}")
   ownerId            String?
-  /// AI lead score (Phase 8)
+  /// Rule-based lead score 0–100 (Phase 8), with grade and explanation
   score              Int?
   scoreReason        String?
+  scoreGrade         String?
+  scoreBreakdown     Json?
+  scoredAt           DateTime?
+  /// Cached AI insights (summary, next best action, drafted message)
+  aiInsights         Json?
+  aiInsightsAt       DateTime?
   lastContactedAt    DateTime?
   nextFollowUpAt     DateTime?
   convertedContactId String?
@@ -774,6 +782,7 @@ model Lead {
 
   @@index([organizationId, ownerId])
   @@index([organizationId, status])
+  @@index([organizationId, score])
   @@index([organizationId, emailNormalized])
   @@index([organizationId, phoneNormalized])
   @@map("lead")

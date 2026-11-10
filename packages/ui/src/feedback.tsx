@@ -9,7 +9,7 @@ export const badgeVariants = cva('inline-flex items-center rounded-full px-2.5 p
       primary: 'bg-primary/10 text-primary',
       success: 'bg-success/15 text-success-text',
       warning: 'bg-warning/15 text-warning-text',
-      danger: 'bg-destructive/15 text-destructive',
+      danger: 'bg-destructive/15 text-destructive-text',
     },
   },
   defaultVariants: { tone: 'neutral' },

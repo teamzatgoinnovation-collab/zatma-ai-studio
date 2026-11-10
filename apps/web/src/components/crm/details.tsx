@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRightLeft, Globe, Mail, MessageCircle, Pencil, Phone, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Globe, Mail, MessageCircle, Pencil, Phone, Sparkles, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
@@ -14,6 +14,7 @@ import { formatDate, formatMoney, LEAD_STATUS_LABELS, LEAD_STATUS_TONES, LIFECYC
 import { CompanySheet, ContactSheet, LeadSheet } from './forms';
 import { DealPanel } from './pipeline';
 import { describeError, OwnerChip, Tags, useCrmAccess } from './shared';
+import { DraftMessageDialog, LeadInsightsCard, LeadScoreCard, ScoreBadge } from './scoring';
 import { ActivityComposer, Timeline } from './timeline';
 
 function NotFoundOr({ error, what, onRetry }: { error: unknown; what: string; onRetry: () => void }) {
@@ -241,7 +242,9 @@ export function LeadDetail({ id }: { id: string }) {
             <Field label="Last contacted">{l.lastContactedAt ? formatDate(l.lastContactedAt, true) : null}</Field>
             <Field label="Next follow-up">{l.nextFollowUpAt ? formatDate(l.nextFollowUpAt, true) : null}</Field>
             <Field label="Created">{formatDate(l.createdAt)}</Field>
-            <Field label="AI score">{l.score ?? <span className="text-muted-foreground">Phase 8</span>}</Field>
+            <Field label="Score">
+              <ScoreBadge score={l.score} grade={l.scoreGrade} />
+            </Field>
             {l.tags.length > 0 && (
               <div className="col-span-2">
                 <Field label="Tags">
@@ -260,6 +263,12 @@ export function LeadDetail({ id }: { id: string }) {
         }
         side={
           <>
+            {!converted && (
+              <div className="grid gap-4 xl:grid-cols-2">
+                <LeadScoreCard leadId={l.id} />
+                <LeadInsightsCard lead={l} />
+              </div>
+            )}
             {!converted && <ActivityComposer link={{ leadId: l.id }} canWrite={access.canWrite} />}
             <h2 className="text-lg font-semibold">Activity</h2>
             {timeline.isPending ? <Skeleton className="h-32" /> : <Timeline activities={timeline.data?.activities ?? []} canWrite={access.canWrite && !converted} emptyText="No calls, messages or notes yet." />}
@@ -281,7 +290,10 @@ export function ContactDetail({ id }: { id: string }) {
   const contact = useQuery({ queryKey: ['crm', 'contact', id], queryFn: () => api.crm.contacts.get(id) });
   const timeline = useQuery({ queryKey: ['crm', 'contact', id, 'timeline'], queryFn: () => api.crm.contacts.timeline(id) });
   const [editing, setEditing] = useState(false);
+  const [drafting, setDrafting] = useState(false);
   const [openDeal, setOpenDeal] = useState<string | null>(null);
+  const org = useQuery({ queryKey: ['organization', 'current'], queryFn: api.organizations.current });
+  const canAi = access.canWrite && (org.data?.permissions.includes('ai:generate') ?? false);
   const remove = useMutation({
     mutationFn: () => api.crm.contacts.remove(id),
     onSuccess: async () => {
@@ -317,6 +329,11 @@ export function ContactDetail({ id }: { id: string }) {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              {canAi && (
+                <Button variant="outline" onClick={() => setDrafting(true)}>
+                  <Sparkles aria-hidden="true" /> Draft message
+                </Button>
+              )}
               {access.canWrite && (
                 <Button variant="outline" onClick={() => setEditing(true)}>
                   <Pencil aria-hidden="true" /> Edit
@@ -383,6 +400,7 @@ export function ContactDetail({ id }: { id: string }) {
         }
       />
       <ContactSheet open={editing} onOpenChange={setEditing} record={c} />
+      {drafting && <DraftMessageDialog contact={c} open={drafting} onOpenChange={setDrafting} />}
       <DealPanel dealId={openDeal} onClose={() => setOpenDeal(null)} />
     </>
   );

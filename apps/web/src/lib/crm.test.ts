@@ -37,3 +37,12 @@ describe('CRM helpers', () => {
     expect(initials('')).toBe('?');
   });
 });
+
+describe('scoring helpers', () => {
+  it('converts settings lists and labels weights', async () => {
+    const { listToText, textToList, weightLabel } = await import('./crm');
+    expect(textToList(' Retail, retail ,\nBakery,, ')).toEqual(['Retail', 'Bakery']);
+    expect(listToText(['Kochi', 'Dubai'])).toBe('Kochi, Dubai');
+    expect([weightLabel(0), weightLabel(1), weightLabel(2), weightLabel(1.5)]).toEqual(['Off', 'Normal', '2×', '1.5×']);
+  });
+});

@@ -55,20 +55,32 @@ import {
   type UpdateDealInput,
   type UpdateLeadInput,
 } from '@zatma/validation';
+import {
+  draftMessageSchema,
+  leadInsightsRequestSchema,
+  scoringSettingsSchema,
+  type DraftMessageInput,
+  type ScoringSettings,
+} from '@zatma/validation';
+import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import { Audit } from '../audit/audit.decorator.js';
 import { RequirePermissions } from '../common/decorators/auth.decorators.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
+import { TenantContext } from '../common/tenant-context.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService, startOfDayInZone } from './activities.service.js';
 import { CrmContext, currentUserId, ownerScope } from './crm-common.js';
+import { CrmAiService } from './crm-ai.service.js';
 import { CrmImportService } from './import.service.js';
+import { ScoringScheduler, ScoringService } from './scoring.service.js';
 import { LeadsService } from './leads.service.js';
 import { PipelineService } from './pipeline.service.js';
 import { CompaniesService, ContactsService } from './records.service.js';
 
 const uuid = new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.NOT_FOUND });
 const EXPORT_CAP = 10_000;
+const AI_THROTTLE = { default: { limit: () => (process.env.NODE_ENV === 'test' ? 10_000 : 20), ttl: 60_000 } };
 const exportQuery = <T extends z.ZodType>(schema: T) => new ZodValidationPipe(schema);
 const attachment = (name: string) => `attachment; filename="${name}.csv"`;
 const day = (d: string | null) => (d ? d.slice(0, 10) : '');
@@ -83,6 +95,8 @@ export class LeadsController {
     private readonly leads: LeadsService,
     private readonly crm: CrmContext,
     private readonly activities: ActivitiesService,
+    private readonly scoring: ScoringService,
+    private readonly ai: CrmAiService,
   ) {}
 
   @Get()
@@ -137,6 +151,28 @@ export class LeadsController {
     return this.activities.leadTimeline(id);
   }
 
+  @Get(':id/score')
+  @RequirePermissions('crm:read')
+  @ApiOperation({ summary: 'Explainable score: every signal with its points and reason' })
+  score(@Param('id', uuid) id: string) {
+    return this.scoring.breakdown(id);
+  }
+
+  @Get(':id/insights')
+  @RequirePermissions('crm:read')
+  @ApiOperation({ summary: 'Last generated AI insights (or null)' })
+  cachedInsights(@Param('id', uuid) id: string) {
+    return this.ai.cachedInsights(id).then((i) => ({ insights: i }));
+  }
+
+  @Post(':id/insights')
+  @Throttle(AI_THROTTLE)
+  @RequirePermissions('crm:write', 'ai:generate')
+  @ApiOperation({ summary: 'Generate AI insights: summary, next best action, talking points, drafted message (uses credits)' })
+  insights(@Param('id', uuid) id: string, @Body(new ZodValidationPipe(leadInsightsRequestSchema)) body: { language?: string }) {
+    return this.ai.leadInsights(id, body.language);
+  }
+
   @Patch(':id')
   @RequirePermissions('crm:write')
   @Audit('lead.updated', 'lead')
@@ -167,7 +203,19 @@ export class LeadsController {
 @ApiCookieAuth()
 @Controller('crm/contacts')
 export class ContactsController {
-  constructor(private readonly contacts: ContactsService) {}
+  constructor(
+    private readonly contacts: ContactsService,
+    private readonly ai: CrmAiService,
+  ) {}
+
+  @Post(':id/draft-message')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(AI_THROTTLE)
+  @RequirePermissions('crm:write', 'ai:generate')
+  @ApiOperation({ summary: 'AI-drafted WhatsApp, email or SMS message for a contact (uses credits; not sent)' })
+  draft(@Param('id', uuid) id: string, @Body(new ZodValidationPipe(draftMessageSchema)) body: DraftMessageInput) {
+    return this.ai.draftContactMessage(id, body);
+  }
 
   @Get()
   @RequirePermissions('crm:read')
@@ -518,6 +566,39 @@ export class ImportController {
   }
 }
 
+@ApiTags('CRM')
+@ApiCookieAuth()
+@Controller('crm/scoring')
+export class ScoringController {
+  constructor(
+    private readonly scoring: ScoringService,
+    private readonly scheduler: ScoringScheduler,
+  ) {}
+
+  @Get('settings')
+  @RequirePermissions('crm:read')
+  settings() {
+    return this.scoring.settings();
+  }
+
+  @Patch('settings')
+  @RequirePermissions('crm:delete')
+  @Audit('crm.scoring_updated', 'organization')
+  @ApiOperation({ summary: 'Update scoring weights, targets and thresholds (then recalculate)' })
+  update(@Body(new ZodValidationPipe(scoringSettingsSchema)) body: ScoringSettings) {
+    return this.scoring.updateSettings(body);
+  }
+
+  @Post('recalculate')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @RequirePermissions('crm:delete')
+  @Audit('crm.scoring_recalculated', 'organization')
+  async recalculate() {
+    await this.scheduler.enqueue(TenantContext.requireOrganizationId());
+    return { queued: true };
+  }
+}
+
 @Injectable()
 export class CrmSummaryService {
   constructor(
@@ -533,7 +614,8 @@ export class CrmSummaryService {
     const today = startOfDayInZone(now, user?.timezone ?? 'Asia/Kolkata');
     const tomorrow = new Date(today.getTime() + 86_400_000);
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const [byStatus, contacts, customers, companies, open, won, overdue, dueToday] = await Promise.all([
+    const openLeads = { deletedAt: null, status: { in: ['NEW', 'CONTACTED', 'QUALIFIED'] as LeadStatus[] }, ...scope };
+    const [byStatus, contacts, customers, companies, open, won, overdue, dueToday, byGrade, top] = await Promise.all([
       db.lead.groupBy({ by: ['status'], where: { deletedAt: null, ...scope }, _count: { _all: true } }),
       db.contact.count({ where: { deletedAt: null, ...scope } }),
       db.contact.count({ where: { deletedAt: null, lifecycle: 'CUSTOMER', ...scope } }),
@@ -542,11 +624,17 @@ export class CrmSummaryService {
       db.deal.aggregate({ where: { deletedAt: null, status: 'WON', closedAt: { gte: monthStart }, ...scope }, _count: { _all: true }, _sum: { value: true } }),
       db.activity.count({ where: { deletedAt: null, completedAt: null, dueAt: { lt: now }, ...scope } }),
       db.activity.count({ where: { deletedAt: null, completedAt: null, dueAt: { gte: today, lt: tomorrow }, ...scope } }),
+      db.lead.groupBy({ by: ['scoreGrade'], where: openLeads, _count: { _all: true } }),
+      db.lead.findMany({ where: { ...openLeads, score: { not: null } }, orderBy: [{ score: 'desc' }, { updatedAt: 'desc' }], take: 5 }),
     ]);
+    const leadsByGrade = { HOT: 0, WARM: 0, COLD: 0 };
+    for (const g of byGrade) if (g.scoreGrade && g.scoreGrade in leadsByGrade) leadsByGrade[g.scoreGrade as keyof typeof leadsByGrade] = g._count._all;
     const leadsByStatus = Object.fromEntries(LEAD_STATUSES.map((s) => [s, 0])) as Record<LeadStatus, number>;
     for (const r of byStatus) leadsByStatus[r.status] = r._count._all;
     return {
       leadsByStatus,
+      leadsByGrade,
+      callFirst: top.map((l) => ({ id: l.id, name: [l.firstName, l.lastName].filter(Boolean).join(' '), company: l.company, score: l.score!, grade: (l.scoreGrade ?? 'COLD') as 'HOT' | 'WARM' | 'COLD', reason: l.scoreReason })),
       contacts,
       customers,
       companies,

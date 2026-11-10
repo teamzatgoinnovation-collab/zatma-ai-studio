@@ -29,6 +29,7 @@ import { formatDate, formatMoney, LEAD_STATUS_LABELS, LEAD_STATUS_TONES, LIFECYC
 import { CompanySheet, ContactSheet, DealSheet, LeadSheet } from './forms';
 import { ImportDialog } from './import-dialog';
 import { DealPanel } from './pipeline';
+import { ScoreBadge } from './scoring';
 import { describeError, OwnerChip, Tags, useCrmAccess, useDebounced, useMembers } from './shared';
 
 // ───────────── Table ─────────────
@@ -195,14 +196,16 @@ export function LeadsList() {
   const [status, setStatus] = useState('');
   const [source, setSource] = useState('');
   const [ownerId, setOwnerId] = useState('');
+  const [grade, setGrade] = useState('');
+  const [sort, setSort] = useState('createdAt');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
-  const filters = { q: search, status, source, ownerId };
+  const filters = { q: search, status, source, ownerId, grade, sort };
   const list = useQuery({
     queryKey: ['crm', 'leads', filters, page],
-    queryFn: () => api.crm.leads.list(toQuery({ ...filters, page, pageSize: 25 })),
+    queryFn: () => api.crm.leads.list(toQuery({ ...filters, order: sort === 'name' || sort === 'nextFollowUpAt' ? 'asc' : 'desc', page, pageSize: 25 })),
     placeholderData: keepPreviousData,
   });
   const bulk = useMutation({
@@ -222,6 +225,7 @@ export function LeadsList() {
   const columns: Column<LeadDto>[] = [
     { key: 'name', header: 'Name', cell: (l) => personLink(`/crm/leads/${l.id}`, l.name, l.company) },
     { key: 'contact', header: 'Phone / email', cell: (l) => <span className="text-muted-foreground">{l.phone ?? l.email ?? '—'}</span> },
+    { key: 'score', header: 'Score', cell: (l) => <ScoreBadge score={l.score} grade={l.scoreGrade} reason={l.scoreReason} /> },
     { key: 'status', header: 'Status', cell: (l) => <Badge tone={LEAD_STATUS_TONES[l.status]}>{LEAD_STATUS_LABELS[l.status]}</Badge> },
     { key: 'source', header: 'Source', cell: (l) => SOURCE_LABELS[l.source] },
     { key: 'owner', header: 'Owner', cell: (l) => <OwnerChip owner={l.owner} /> },
@@ -235,7 +239,19 @@ export function LeadsList() {
         <SearchBox id="lead-search" label="Search leads" value={q} onChange={set(setQ)} />
         <FilterSelect id="filter-status" label="Status" value={status} onChange={set(setStatus)} options={LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] }))} />
         <FilterSelect id="filter-source" label="Source" value={source} onChange={set(setSource)} options={LEAD_SOURCES.map((s) => ({ value: s, label: SOURCE_LABELS[s] }))} />
+        <FilterSelect id="filter-grade" label="Grade" value={grade} onChange={set(setGrade)} options={[{ value: 'HOT', label: 'Hot' }, { value: 'WARM', label: 'Warm' }, { value: 'COLD', label: 'Cold' }]} />
         <OwnerFilter value={ownerId} onChange={set(setOwnerId)} />
+        <div className="w-44">
+          <Label htmlFor="lead-sort" className="sr-only">
+            Sort
+          </Label>
+          <Select id="lead-sort" value={sort} onChange={(e) => set(setSort)(e.target.value)}>
+            <option value="createdAt">Newest first</option>
+            <option value="score">Highest score</option>
+            <option value="nextFollowUpAt">Next follow-up</option>
+            <option value="name">Name</option>
+          </Select>
+        </div>
         <div className="ml-auto flex gap-2">
           <Button variant="outline" asChild>
             <a href={`/api/v1/crm/leads/export.csv${queryString(filters)}`} download>
@@ -305,7 +321,7 @@ export function LeadsList() {
         {list.data && list.data.data.length === 0 ? (
           <EmptyState
             icon={<UserRound />}
-            title={search || status || source || ownerId ? 'No leads match these filters' : 'No leads yet'}
+            title={search || status || source || ownerId || grade ? 'No leads match these filters' : 'No leads yet'}
             description="Add leads by hand, import a CSV, or capture them from forms and ads in later phases."
             action={
               access.canWrite ? (

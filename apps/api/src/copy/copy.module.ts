@@ -8,5 +8,6 @@ import { DesignTranslationService } from './design-translation.service.js';
   imports: [DesignModule],
   controllers: [CopyController, CopyAssetController, DesignTranslationController],
   providers: [CopyService, DesignTranslationService],
+  exports: [CopyService],
 })
 export class CopyModule {}

@@ -130,3 +130,26 @@ export const initials = (name: string) =>
     .slice(0, 2)
     .map((p) => p[0]!.toUpperCase())
     .join('') || '?';
+
+// ───────────── Scoring ─────────────
+
+export type Grade = 'HOT' | 'WARM' | 'COLD';
+export const GRADE_LABELS: Record<Grade, string> = { HOT: 'Hot', WARM: 'Warm', COLD: 'Cold' };
+export const GRADE_TONES: Record<Grade, 'danger' | 'warning' | 'neutral'> = { HOT: 'danger', WARM: 'warning', COLD: 'neutral' };
+
+/** Comma/newline separated text ↔ trimmed, de-duplicated list (settings form fields). */
+export const listToText = (items: string[]) => items.join(', ');
+export function textToList(text: string, max = 50): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of text.split(/[,\n]/)) {
+    const v = raw.trim().slice(0, 60);
+    if (!v || seen.has(v.toLowerCase())) continue;
+    seen.add(v.toLowerCase());
+    out.push(v);
+  }
+  return out.slice(0, max);
+}
+
+/** Weight slider label: 0 = off, 1 = normal, 2 = double, … */
+export const weightLabel = (w: number) => (w === 0 ? 'Off' : w === 1 ? 'Normal' : `${w}×`);
