@@ -273,11 +273,11 @@ const listBase = {
   q: z.string().trim().max(100).optional(),
   ownerId: z.string().max(64).optional(),
   tag: z.string().trim().max(40).optional(),
-  sort: z.enum(['createdAt', 'updatedAt', 'name', 'lastContactedAt', 'nextFollowUpAt', 'value', 'expectedCloseAt']).default('createdAt'),
+  sort: z.enum(['createdAt', 'updatedAt', 'name', 'lastContactedAt', 'nextFollowUpAt', 'value', 'expectedCloseAt', 'score']).default('createdAt'),
   order: z.enum(['asc', 'desc']).default('desc'),
 };
 
-export const listLeadsSchema = z.object({ ...listBase, status: z.enum(LEAD_STATUSES).optional(), source: z.enum(LEAD_SOURCES).optional() });
+export const listLeadsSchema = z.object({ ...listBase, status: z.enum(LEAD_STATUSES).optional(), source: z.enum(LEAD_SOURCES).optional(), grade: z.enum(['HOT', 'WARM', 'COLD']).optional() });
 export type ListLeadsInput = z.infer<typeof listLeadsSchema>;
 
 export const convertLeadSchema = z
@@ -477,6 +477,9 @@ export interface LeadDto extends PersonDto {
   sourceDetail: string | null;
   notes: string | null;
   score: number | null;
+  scoreGrade: 'HOT' | 'WARM' | 'COLD' | null;
+  /** Top reasons behind the score. */
+  scoreReason: string | null;
   lastContactedAt: string | null;
   nextFollowUpAt: string | null;
   convertedContactId: string | null;
@@ -598,6 +601,9 @@ export interface DuplicateMatch {
 
 export interface CrmSummary {
   leadsByStatus: Record<LeadStatus, number>;
+  leadsByGrade: Record<'HOT' | 'WARM' | 'COLD', number>;
+  /** Highest-scoring open leads to call first. */
+  callFirst: Array<{ id: string; name: string; company: string | null; score: number; grade: 'HOT' | 'WARM' | 'COLD'; reason: string | null }>;
   contacts: number;
   customers: number;
   companies: number;

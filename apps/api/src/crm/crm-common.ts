@@ -137,6 +137,8 @@ export function toLeadDto(l: Lead & WithOwner): LeadDto {
     customFields: (l.customFields ?? {}) as Fields,
     owner: ownerRef(l.owner),
     score: l.score,
+    scoreGrade: (l.scoreGrade as LeadDto['scoreGrade']) ?? null,
+    scoreReason: l.scoreReason,
     lastContactedAt: iso(l.lastContactedAt),
     nextFollowUpAt: iso(l.nextFollowUpAt),
     convertedContactId: l.convertedContactId,

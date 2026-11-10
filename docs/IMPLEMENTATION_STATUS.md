@@ -9,8 +9,8 @@
 | 4 | AI provider integration | ✅ Completed |
 | 5 | AI Design Studio | ✅ Completed |
 | 6 | AI Copywriter | ✅ Completed |
-| 7 | CRM core | ✅ Completed (awaiting approval for Phase 8) |
-| 8 | AI lead scoring & intelligence | ⏳ Pending |
+| 7 | CRM core | ✅ Completed |
+| 8 | AI lead scoring & intelligence | ✅ Completed (awaiting approval for Phase 9) |
 | 9 | Social media account integration | ⏳ Pending |
 | 10 | Social content management | ⏳ Pending |
 | 11 | Meta Ads manager | ⏳ Pending |
@@ -584,3 +584,78 @@ The CRM e2e tests cover:
 
 ### Next phase
 **Phase 8: AI lead scoring & intelligence.** Explainable, configurable lead scores using the fields reserved in this phase, next-best-action suggestions and AI-drafted follow-up messages.
+
+## Phase 8: AI lead scoring & intelligence (✅ Completed)
+
+### Features implemented
+* **Explainable lead score** (`packages/validation/src/scoring.ts`): a deterministic, pure 0–100 score that is the sum of 12 weighted signals. Each signal records its points and a plain-language reason.
+  * **Fit:** reachability (phone, WhatsApp, email); business lead (has a company); decision maker (whole-word match on job title); target industry and city; source quality (referral > walk-in > website / WhatsApp > ads > import).
+  * **Engagement:** recency of contact (15 / 12 / 8 / 4 points for 3 / 7 / 14 / 30 days); interactions in the last 14 days; an upcoming follow-up; qualification status.
+  * **Risk:** no contact for more than 30 days (−10); an overdue follow-up (−8).
+  * Unqualified and lost leads score 0, with the reason shown.
+  * Grades are Hot, Warm and Cold, with configurable thresholds (70 / 40 by default).
+  * **AI never sets the score.**
+* **Scoring settings** per organization (`organization.crmSettings.scoring`): a weight per signal (off, 0.5×, 1×, 1.5×, 2×, 3×), target industries and cities, decision-maker keywords, and the thresholds. Managers edit them in **Settings → CRM scoring**; saving recalculates every lead on the BullMQ `crm-scoring` queue.
+* **Score updates:**
+  * Immediately on lead create and update, bulk status changes, CSV import, and any activity change (log, complete, delete, follow-up).
+  * A nightly scheduled job (21:30 UTC, 03:00 IST) refreshes recency decay and overdue penalties for every organization.
+* **AI insights** (optional, metered with purpose `crm`, cached on the lead):
+  * A summary, the next best action (call, WhatsApp, email, meeting, nurture or disqualify, plus when) with its reason, talking points, and a drafted WhatsApp or email follow-up in the chosen language.
+  * Grounded only in the lead's own fields, its activity history, its score breakdown and the brand kit; the model is told never to invent prices, dates, promises or contacts.
+  * One repair retry, then `AI_OUTPUT_INVALID`.
+  * "Schedule it" turns the suggestion into a high-priority follow-up.
+* **AI-drafted messages for contacts:** WhatsApp, email or SMS, with a goal (follow up, re-engage, thank you, meeting request, offer) and an optional extra note. Nothing is sent: the user copies the text or opens it in WhatsApp.
+* **Web:**
+  * **Leads list:** a score column (grade and value, with the top reasons as a tooltip and screen-reader text), a "Highest score" sort and a grade filter.
+  * **Lead detail:** a "Lead score" card with a meter and every signal's points and reason, and an "AI insights" card with language choice, Generate / Refresh, next best action with Schedule it, talking points, and the drafted message with Copy and Open in WhatsApp (Arabic shown right-to-left).
+  * **Contact detail:** a "Draft message" dialog.
+  * **CRM overview:** Hot / Warm / Cold counts and a "Call first" list of the top five open leads with their reasons.
+  * **Settings → CRM scoring:** weight sliders, ideal-customer fields and thresholds (read-only for non-managers).
+* **Accessibility fix:** the shared red "danger" badge had 3.78:1 contrast in the light theme. It now uses a new `--destructive-text` token, as the success and warning badges do. This also improves the "Lost" and "Overdue" badges from Phase 7.
+
+### Database changes
+Migration `20261110152942_phase8_lead_scoring`:
+* `lead` gains `scoreGrade`, `scoreBreakdown` (JSON), `scoredAt`, `aiInsights` (JSON) and `aiInsightsAt`, plus an index on `(organizationId, score)`.
+* `organization` gains `crmSettings` (JSON).
+
+### APIs
+See `API_DOCUMENTATION.md` → Phase 8 endpoints.
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Validation unit (every signal, decay, penalties, weights and targets, caps, thresholds, determinism, settings and insights schemas, due dates) | ✅ 32 passed (8 new) |
+| API unit (insights prompt grounding, activity summaries) | ✅ 78 passed (2 new) |
+| API e2e | ✅ 93 passed (7 new) |
+| Web unit | ✅ 56 passed (1 new) |
+| Lint, typecheck, build | ✅ |
+
+The 7 scoring e2e tests cover:
+* Scores on create and the full breakdown.
+* The score rising with a call, rising with a planned follow-up, falling when it becomes overdue, and 0 when lost.
+* Sort and grade filter; the summary's grade counts and Call-first list (lost leads excluded).
+* Settings validation, then the queued recalculation applying new weights and thresholds.
+* Insights: 503 with no provider; a repair retry; cached and metered; invalid output → 422.
+* A grounded draft message for a contact.
+* Sales Agents can't see others' scores or insights, or change settings; Viewers can read scores but not generate insights; tenant isolation, with each organization keeping its own defaults.
+
+**Browser run (Playwright, production build, real Anthropic SDK pointed at a local stand-in):** 18 checks passed with no console errors.
+* The lead scored 57 (Warm) on create.
+* "Highest score" sort and the grade filter worked.
+* Five explained signals were shown.
+* Logging a call raised the score to 75 (Hot).
+* Malayalam AI insights were generated, with a `wa.me` link carrying the drafted text.
+* "Schedule it" added a follow-up (+6, giving 81).
+* Turning source quality off and raising Hot to 80 rescored the lead to 69 (Warm).
+* The overview's Call-first list puts the lead first.
+* A contact email draft was generated.
+* axe found no serious or critical violations on the leads, lead detail (light and dark), scoring settings, overview and draft dialog.
+* No horizontal scroll on mobile.
+
+### Remaining issues / notes
+* **Not run against real provider APIs** (no keys yet). Malayalam and Arabic drafts should be reviewed by native speakers once keys are added.
+* **The score is rule-based by design.** A learned model (for example, trained on won and lost history) can be added later behind the same breakdown format.
+* **The nightly job time** (21:30 UTC) is platform-wide, not per organization time zone.
+
+### Next phase
+**Phase 9: Social media account integration.** OAuth connections for Facebook Pages, Instagram Business, LinkedIn and YouTube, with encrypted token storage, refresh, health checks and account selection per workspace. This needs app credentials from each platform.

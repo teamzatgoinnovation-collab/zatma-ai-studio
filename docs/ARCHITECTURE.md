@@ -186,6 +186,16 @@ Safeguards:
 3. The worker runs in a tenant context rebuilt from the importer's membership (role and permissions), so ownership and visibility rules apply.
 4. Rows go through the same services as the API; the plan capacity is counted down per created contact or lead; per-row errors are capped at 200.
 
+## 8c. Lead scoring vs AI insights (Phase 8)
+
+Two separate layers:
+
+1. **Score (deterministic):**
+   * `scoreLead(input, settings, now)` is a pure function shared by the API and the tests. The API stores the score, grade, reason and full signal breakdown on the lead.
+   * It runs synchronously after lead and activity writes. The `crm-scoring` queue handles "recalculate all" and the nightly decay pass, which runs inside each organization's tenant context.
+   * Because it is rules plus weights, every point can be explained and audited, and it costs nothing to run.
+2. **Insights (AI, on request):** `CrmAiService` sends the lead's own fields, its last 12 activities, the score breakdown and the default brand kit through `CopyService.runJson` (provider chain, credits, JSON validation and repair). The result is cached on the lead. AI output never changes the score, status or owner; a suggestion only becomes an activity when a user clicks "Schedule it".
+
 ## 9. Tooling versions
 
 Exact versions are pinned in each `package.json` and the `pnpm-lock.yaml`. Major versions

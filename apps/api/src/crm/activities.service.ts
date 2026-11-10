@@ -6,6 +6,7 @@ import { paginate } from '../common/pagination.js';
 import { TenantContext } from '../common/tenant-context.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ScoringService } from './scoring.service.js';
 import { activityInclude, CrmContext, currentUserId, dealInclude, ownerScope, seesAllRecords, toActivityDto, toDealDto } from './crm-common.js';
 
 /** Activity types that count as contacting the person. */
@@ -37,6 +38,7 @@ export class ActivitiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crm: CrmContext,
+    private readonly scoring: ScoringService,
   ) {}
 
   private get db() {
@@ -65,6 +67,7 @@ export class ActivitiesService {
         await this.db.lead.updateMany({ where: { id }, data });
         // First contact moves a NEW lead to CONTACTED.
         if (contactedAt) await this.db.lead.updateMany({ where: { id, status: 'NEW' }, data: { status: 'CONTACTED' } });
+        await this.scoring.scoreOne(id);
       } else await this.db.contact.updateMany({ where: { id }, data });
     }
   }

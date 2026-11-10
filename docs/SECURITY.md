@@ -51,6 +51,12 @@
 * **CSV export:** cells starting with `=`, `+`, `-`, `@`, tab or CR are prefixed with `'` so spreadsheets don't run them as formulas (CSV injection). Exports respect the user's filters and visibility.
 * **WhatsApp:** the CRM only builds `wa.me` click-to-chat links. Messages are sent from the user's own app until the WhatsApp Business API integration (Phase 14), which will add consent tracking.
 
+## AI on CRM data (Phase 8)
+
+* Prompts for insights and drafted messages contain only the requesting organization's own record (lead or contact fields, recent activity subjects and bodies, score signals) and its brand kit. Ownership scoping applies before anything is sent, so Sales Agents cannot generate insights for colleagues' leads.
+* AI output is advisory. It cannot change scores, statuses or owners, and messages are never sent automatically.
+* Calls are metered (purpose `crm`) against the plan's AI credits, and throttled to 20/min per client.
+
 ## File uploads
 * Uploads use presigned PUT URLs to private buckets. The MIME allow-list is enforced, size is capped per plan, and keys are namespaced
   `org/<organizationId>/<uuid>`. Files are served through short-lived signed GET URLs.

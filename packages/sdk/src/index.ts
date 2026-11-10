@@ -24,6 +24,12 @@ import type {
   Workspace,
 } from '@zatma/types';
 import type {
+  DraftMessageInput,
+  DraftMessageResult,
+  LeadInsights,
+  LeadScoreDto,
+  ScoringSettings,
+  ScoringSettingsInput,
   ActivityDto,
   BoardDto,
   BulkLeadsInput,
@@ -221,6 +227,9 @@ export function createApiClient(options: ApiClientOptions) {
         duplicates: (query: { email?: string; phone?: string; excludeLeadId?: string; excludeContactId?: string }) => request<DuplicateMatch[]>('GET', '/crm/leads/duplicates', undefined, query),
         convert: (leadId: string, input: Partial<ConvertLeadInput>) => request<{ lead: LeadDto; contact: ContactDto; deal: DealDto | null }>('POST', `/crm/leads/${id(leadId)}/convert`, input),
         timeline: (leadId: string) => request<TimelineDto>('GET', `/crm/leads/${id(leadId)}/timeline`),
+        score: (leadId: string) => request<LeadScoreDto>('GET', `/crm/leads/${id(leadId)}/score`),
+        insights: (leadId: string) => request<{ insights: LeadInsights | null }>('GET', `/crm/leads/${id(leadId)}/insights`),
+        generateInsights: (leadId: string, language?: string) => request<LeadInsights>('POST', `/crm/leads/${id(leadId)}/insights`, language ? { language } : {}),
       },
       contacts: {
         list: (query?: Query) => request<Paginated<ContactDto>>('GET', '/crm/contacts', undefined, query),
@@ -230,6 +239,12 @@ export function createApiClient(options: ApiClientOptions) {
         update: (contactId: string, input: UpdateContactInput) => request<ContactDto>('PATCH', `/crm/contacts/${id(contactId)}`, input),
         remove: (contactId: string) => request<void>('DELETE', `/crm/contacts/${id(contactId)}`),
         timeline: (contactId: string) => request<TimelineDto>('GET', `/crm/contacts/${id(contactId)}/timeline`),
+        draftMessage: (contactId: string, input: Partial<DraftMessageInput>) => request<DraftMessageResult>('POST', `/crm/contacts/${id(contactId)}/draft-message`, input),
+      },
+      scoring: {
+        settings: () => request<ScoringSettings>('GET', '/crm/scoring/settings'),
+        updateSettings: (input: ScoringSettingsInput) => request<ScoringSettings>('PATCH', '/crm/scoring/settings', input),
+        recalculate: () => request<{ queued: boolean }>('POST', '/crm/scoring/recalculate'),
       },
       companies: {
         list: (query?: Query) => request<Paginated<CompanyDto>>('GET', '/crm/companies', undefined, query),

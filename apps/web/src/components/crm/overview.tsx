@@ -4,11 +4,12 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { CalendarClock, KanbanSquare, Trophy, UserRound, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { Card, CardContent, EmptyState, ErrorState, Label, Select, Skeleton, Tabs } from '@zatma/ui';
+import { Badge, Card, CardContent, EmptyState, ErrorState, Label, Select, Skeleton, Tabs } from '@zatma/ui';
 import { ACTIVITY_TYPES, LEAD_STATUSES } from '@zatma/validation';
 import { api } from '@/lib/api';
 import { ACTIVITY_LABELS, formatMoney, LEAD_STATUS_LABELS, toQuery } from '@/lib/crm';
 import { Pager } from './lists';
+import { ScoreBadge } from './scoring';
 import { useCrmAccess } from './shared';
 import { ActivityItem } from './timeline';
 
@@ -46,6 +47,35 @@ export function CrmOverview() {
         <Stat label={`Follow-ups due today${s.followUps.overdue ? ` · ${s.followUps.overdue} overdue` : ''}`} value={s.followUps.today.toLocaleString()} href="/crm/follow-ups" icon={<CalendarClock />} />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardContent className="space-y-3 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold">Call first</h2>
+              <span className="flex gap-1.5 text-sm">
+                <Badge tone="danger">Hot {s.leadsByGrade.HOT}</Badge>
+                <Badge tone="warning">Warm {s.leadsByGrade.WARM}</Badge>
+                <Badge>Cold {s.leadsByGrade.COLD}</Badge>
+              </span>
+            </div>
+            {s.callFirst.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Scored open leads appear here, highest first.</p>
+            ) : (
+              <ol className="divide-y divide-border">
+                {s.callFirst.map((l) => (
+                  <li key={l.id} className="flex items-center justify-between gap-3 py-2.5">
+                    <div className="min-w-0">
+                      <Link href={`/crm/leads/${l.id}`} className="font-medium hover:text-primary hover:underline">
+                        {l.name}
+                      </Link>
+                      <p className="truncate text-xs text-muted-foreground">{[l.company, l.reason].filter(Boolean).join(' · ')}</p>
+                    </div>
+                    <ScoreBadge score={l.score} grade={l.grade} />
+                  </li>
+                ))}
+              </ol>
+            )}
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="space-y-3 p-5">
             <h2 className="font-semibold">Leads by status</h2>

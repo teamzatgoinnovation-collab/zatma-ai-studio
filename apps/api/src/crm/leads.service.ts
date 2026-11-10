@@ -19,6 +19,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { contactInclude, CrmContext, dealInclude, leadInclude, ownerScope, searchOr, seesAllRecords, toContactDto, toDealDto, toLeadDto } from './crm-common.js';
 import { PipelineService } from './pipeline.service.js';
+import { ScoringService } from './scoring.service.js';
 
 const SORT: Record<string, string> = { name: 'firstName', createdAt: 'createdAt', updatedAt: 'updatedAt', lastContactedAt: 'lastContactedAt', nextFollowUpAt: 'nextFollowUpAt' };
 
@@ -29,7 +30,14 @@ export class LeadsService {
     private readonly crm: CrmContext,
     private readonly usage: UsageService,
     private readonly pipelines: PipelineService,
+    private readonly scoring: ScoringService,
   ) {}
+
+  /** Rescore, then return the fresh DTO. */
+  private async scored(id: string): Promise<LeadDto> {
+    await this.scoring.scoreOne(id);
+    return toLeadDto(await this.db.lead.findFirstOrThrow({ where: { id }, include: leadInclude }));
+  }
 
   private get db() {
     return this.prisma.tenant;
@@ -47,12 +55,19 @@ export class LeadsService {
       ...ownerScope(),
       ...(q.status ? { status: q.status } : {}),
       ...(q.source ? { source: q.source } : {}),
+      ...(q.grade ? { scoreGrade: q.grade } : {}),
       ...(q.ownerId && seesAllRecords() ? { ownerId: q.ownerId === 'none' ? null : q.ownerId } : {}),
       ...(q.tag ? { tags: { has: q.tag } } : {}),
       ...searchOr(q.q, ['firstName', 'lastName', 'email', 'phone', 'company']),
     };
     const [rows, total] = await Promise.all([
-      this.db.lead.findMany({ where, include: leadInclude, orderBy: { [SORT[q.sort] ?? 'createdAt']: q.order }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
+      this.db.lead.findMany({
+        where,
+        include: leadInclude,
+        orderBy: q.sort === 'score' ? [{ score: { sort: q.order, nulls: 'last' } }, { createdAt: 'desc' }] : { [SORT[q.sort] ?? 'createdAt']: q.order },
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+      }),
       this.db.lead.count({ where }),
     ]);
     return paginate(rows.map(toLeadDto), total, q);
@@ -74,9 +89,8 @@ export class LeadsService {
     const { allowDuplicate: _ignored, ownerId, ...data } = input;
     const lead = await this.db.lead.create({
       data: { ...data, organizationId, ownerId: await this.crm.resolveOwner(ownerId), ...(await this.crm.keys(data.email, data.phone)) },
-      include: leadInclude,
     });
-    return toLeadDto(lead);
+    return this.scored(lead.id);
   }
 
   async update(id: string, input: UpdateLeadInput): Promise<LeadDto> {
@@ -91,9 +105,8 @@ export class LeadsService {
         ...(ownerId !== undefined ? { ownerId: await this.crm.resolveOwner(ownerId, current.ownerId) } : {}),
         ...(data.email !== undefined || data.phone !== undefined ? await this.crm.keys(email, phone) : {}),
       },
-      include: leadInclude,
     });
-    return toLeadDto(lead);
+    return this.scored(lead.id);
   }
 
   async remove(id: string): Promise<void> {
@@ -112,7 +125,13 @@ export class LeadsService {
       const ownerId = await this.crm.resolveOwner(input.ownerId);
       return { updated: (await this.db.lead.updateMany({ where, data: { ownerId } })).count };
     }
-    if (input.action === 'status') return { updated: (await this.db.lead.updateMany({ where, data: { status: input.status! } })).count };
+    if (input.action === 'status') {
+      const ids = (await this.db.lead.findMany({ where, select: { id: true } })).map((r) => r.id);
+      const updated = (await this.db.lead.updateMany({ where: { id: { in: ids } }, data: { status: input.status! } })).count;
+      const settings = await this.scoring.settings();
+      for (const id of ids) await this.scoring.scoreOne(id, settings);
+      return { updated };
+    }
     // tag: add to each lead that doesn't have it yet
     const rows = await this.db.lead.findMany({ where: { ...where, NOT: { tags: { has: input.tag! } } }, select: { id: true, tags: true } });
     await Promise.all(rows.map((r) => this.db.lead.update({ where: { id: r.id }, data: { tags: [...r.tags, input.tag!] } })));

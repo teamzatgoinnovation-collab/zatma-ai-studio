@@ -55,7 +55,7 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 
 | Table | Key fields |
 |---|---|
-| `lead` ✅ | organizationId, firstName, lastName, email/emailNormalized, phone/phoneNormalized, whatsapp, jobTitle, company, website, industry, city, country, status, source, sourceDetail, notes, tags[], customFields, ownerId, score/scoreReason (P8), lastContactedAt, nextFollowUpAt, convertedContactId/DealId/At, deletedAt |
+| `lead` ✅ | organizationId, firstName, lastName, email/emailNormalized, phone/phoneNormalized, whatsapp, jobTitle, company, website, industry, city, country, status, source, sourceDetail, notes, tags[], customFields, ownerId, score/scoreGrade/scoreReason/scoreBreakdown/scoredAt (P8), aiInsights/aiInsightsAt (P8), lastContactedAt, nextFollowUpAt, convertedContactId/DealId/At, deletedAt |
 | `contact` ✅ | organizationId, companyId?, firstName, lastName, email/phone (+ normalized), whatsapp, jobTitle, lifecycle (LEAD/PROSPECT/CUSTOMER/CHURNED), source, notes, tags[], customFields, ownerId, lastContactedAt, nextFollowUpAt, consent (P14), deletedAt |
 | `company` ✅ | organizationId, name, nameNormalized, website, industry, size, phone, email, address, city, country, tags[], customFields, ownerId, deletedAt |
 | `pipeline`, `pipeline_stage` ✅ | organizationId, name, isDefault / pipelineId, name, order, probability, kind (OPEN/WON/LOST) |

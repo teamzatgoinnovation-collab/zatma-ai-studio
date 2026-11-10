@@ -234,3 +234,20 @@ Error codes:
 * `INVALID_STAGE`, `LOST_REASON_REQUIRED` (422).
 * `INVALID_FILE`, `FILE_TOO_LARGE`, `INVALID_CSV`, `INVALID_MAPPING` (422).
 * `PLAN_LIMIT_REACHED` (402, metric `crmRecords`).
+
+## Phase 8 endpoints
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/crm/leads?sort=score&grade=HOT\|WARM\|COLD` | `crm:read` | Leads sorted by score (empty scores last) and filtered by grade. Items include `score`, `scoreGrade` and `scoreReason` (top reasons) |
+| GET | `/crm/leads/:id/score` | `crm:read` | `{ score, grade, signals: [{ key, label, points, detail }], reason, scoredAt }`, recomputed for today |
+| GET | `/crm/leads/:id/insights` | `crm:read` | `{ insights: LeadInsights \| null }` (last generated) |
+| POST | `/crm/leads/:id/insights` | `crm:write` + `ai:generate` | `{ language? }` → `{ summary, nextBestAction: { action, reason, when }, talkingPoints[], followUpMessage: { channel, subject?, text }, language, generatedAt, provider, model, credits }`. Throttled to 20/min; metered as `crm` |
+| POST | `/crm/contacts/:id/draft-message` | `crm:write` + `ai:generate` | `{ channel: whatsapp\|email\|sms, goal: follow_up\|reengage\|thank_you\|meeting_request\|offer, language?, context? }` → `{ subject, text, … }`. Nothing is sent |
+| GET | `/crm/scoring/settings` | `crm:read` | `{ weights, targetIndustries, targetCities, decisionMakerKeywords, hotThreshold, warmThreshold }` (defaults when not set) |
+| PATCH | `/crm/scoring/settings` | `crm:delete` | Replace the settings (weights 0–3; warm must be below hot) |
+| POST | `/crm/scoring/recalculate` | `crm:delete` | `202 { queued: true }`: rescores every lead of the organization |
+
+`GET /crm/summary` also returns `leadsByGrade` and `callFirst` (the top five open leads by score, scoped to what the user can see).
+
+Error codes: `AI_PROVIDER_UNAVAILABLE` (503), `PLAN_LIMIT_REACHED` (402), `AI_OUTPUT_INVALID` (422).
