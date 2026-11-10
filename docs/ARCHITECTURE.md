@@ -169,6 +169,23 @@ Safeguards:
 * **Limits:** `checkLimits()` counts user-perceived characters (`Intl.Segmenter`) against each platform's limits and SMS segments, so the UI can flag copy that would be truncated or rejected.
 * **Design translation:** layout is kept. Each text layer gets a font that can render the target script (`fontForLanguage`), the right direction and alignment, and a size that fits its box (`fitFontSize` from the composer).
 
+## 8b. CRM (implemented in Phase 7)
+
+**Record-level access:**
+* On top of tenant isolation, `ownerScope()` (`apps/api/src/crm/crm-common.ts`) adds `ownerId = currentUser` to every lead, contact, deal and activity query for users who can write but not delete (Sales Agents).
+* Out-of-scope records therefore return 404, exactly like other tenants' records.
+* `resolveOwner()` makes Sales Agents own what they create, and checks that any assigned owner is a member of the organization.
+
+**Duplicates:** each lead and contact stores `emailNormalized` and `phoneNormalized` (international format, default country from the organization's currency). Creates check both leads and contacts across the whole organization, so colleagues don't create the same person twice.
+
+**Kanban ordering:** deals carry a float `position`. A move takes the midpoint between its neighbours; when the gap runs out, the column is renumbered. Moving into a Won or Lost stage sets status, probability and `closedAt`.
+
+**Import pipeline:**
+1. Upload with the `IMPORT` purpose, then preview (parse and auto-map columns).
+2. A `crm_import` row is created and the `crm-import` queue picks it up.
+3. The worker runs in a tenant context rebuilt from the importer's membership (role and permissions), so ownership and visibility rules apply.
+4. Rows go through the same services as the API; the plan capacity is counted down per created contact or lead; per-row errors are capped at 200.
+
 ## 9. Tooling versions
 
 Exact versions are pinned in each `package.json` and the `pnpm-lock.yaml`. Major versions

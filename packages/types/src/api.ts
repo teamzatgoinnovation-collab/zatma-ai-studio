@@ -55,6 +55,8 @@ export interface PlanLimits {
   members: number;
   socialAccounts: number;
   workspaces: number;
+  /** Contacts + leads stored in the CRM. */
+  crmRecords: number;
 }
 
 export interface PlanSummary {

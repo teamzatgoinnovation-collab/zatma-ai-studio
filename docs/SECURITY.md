@@ -40,6 +40,17 @@
 * Helmet sets security headers. CORS is an allow-list (`WEB_ORIGIN`). React escapes output, and any user HTML
   (landing pages, Phase 15) is sanitised server-side.
 
+## CRM data (Phase 7)
+
+* **Ownership scoping:** Sales Agents see and change only the leads, contacts, deals and activities they own. This is enforced in every query (`ownerScope()`), not just in the UI, and out-of-scope ids return 404. Only managers can assign owners, and only to members of the organization.
+* **CSV import:**
+  * Only uploaded files of the same organization are read.
+  * Files are limited to 2 MB and 5,000 rows, and parsed server-side by a strict RFC 4180 parser.
+  * Every row is validated with the same Zod schemas as the API.
+  * Imports run with the importing user's role.
+* **CSV export:** cells starting with `=`, `+`, `-`, `@`, tab or CR are prefixed with `'` so spreadsheets don't run them as formulas (CSV injection). Exports respect the user's filters and visibility.
+* **WhatsApp:** the CRM only builds `wa.me` click-to-chat links. Messages are sent from the user's own app until the WhatsApp Business API integration (Phase 14), which will add consent tracking.
+
 ## File uploads
 * Uploads use presigned PUT URLs to private buckets. The MIME allow-list is enforced, size is capped per plan, and keys are namespaced
   `org/<organizationId>/<uuid>`. Files are served through short-lived signed GET URLs.

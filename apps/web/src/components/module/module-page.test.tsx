@@ -12,12 +12,12 @@ describe('ModulePage', () => {
   });
 
   it('renders an honest roadmap layout for a planned module (no sample data)', () => {
-    const { section, leaf } = findNavEntry('/crm/pipeline')!;
+    const { section, leaf } = findNavEntry('/marketing/social')!;
     render(<ModulePage section={section} leaf={leaf} />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Sales Pipeline' })).toBeInTheDocument();
-    expect(screen.getByText('Sales Pipeline is coming in Phase 7')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Social Media' })).toBeInTheDocument();
+    expect(screen.getByText('Social Media is coming in Phase 10')).toBeInTheDocument();
     expect(screen.getByText(/Nothing on this page is sample data/)).toBeInTheDocument();
-    expect(screen.getByText('Drag-and-drop between stages')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Invite your sales team/ })).toHaveAttribute('href', '/team');
+    expect(screen.getByText('Platform-specific previews and validation')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Create a workspace per brand or client/ })).toHaveAttribute('href', '/dashboard');
   });
 });

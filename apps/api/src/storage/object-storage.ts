@@ -15,6 +15,15 @@ export interface ObjectStorage {
   head(key: string): Promise<ObjectHead | null>;
   /** Server-side write (generated assets). */
   putObject(key: string, body: Buffer, contentType: string): Promise<void>;
+  /** Server-side read (CSV imports). Throws when the object is larger than `maxBytes`. */
+  getObject(key: string, maxBytes: number): Promise<Buffer>;
+}
+
+export class ObjectTooLargeError extends Error {
+  constructor(readonly maxBytes: number) {
+    super(`Object larger than ${maxBytes} bytes`);
+    this.name = 'ObjectTooLargeError';
+  }
 }
 
 export const OBJECT_STORAGE = Symbol('OBJECT_STORAGE');
@@ -44,6 +53,14 @@ export class S3ObjectStorage implements ObjectStorage {
 
   async putObject(key: string, body: Buffer, contentType: string): Promise<void> {
     await this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType, ContentLength: body.length }));
+  }
+
+  async getObject(key: string, maxBytes: number): Promise<Buffer> {
+    const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    if ((res.ContentLength ?? 0) > maxBytes) throw new ObjectTooLargeError(maxBytes);
+    const bytes = await res.Body!.transformToByteArray();
+    if (bytes.length > maxBytes) throw new ObjectTooLargeError(maxBytes);
+    return Buffer.from(bytes);
   }
 
   async head(key: string): Promise<ObjectHead | null> {

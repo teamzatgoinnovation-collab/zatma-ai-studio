@@ -16,6 +16,7 @@ const METRIC_LABELS: Record<UsageMetric, { label: string; unit?: string }> = {
   workspaces: { label: 'Workspaces' },
   storageMb: { label: 'Storage', unit: ' MB' },
   socialAccounts: { label: 'Connected social accounts' },
+  crmRecords: { label: 'CRM contacts and leads' },
 };
 
 const FEATURES: Record<PlanSummary['code'], string[]> = {

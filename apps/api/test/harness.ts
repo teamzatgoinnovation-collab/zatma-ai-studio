@@ -5,14 +5,16 @@ import { configureApp } from '../src/app.factory.js';
 import { ENV } from '../src/config/config.module.js';
 import { loadEnv } from '../src/config/env.js';
 import { PAYMENT_PROVIDER, type PaymentProvider } from '../src/billing/payment-provider.interface.js';
-import { OBJECT_STORAGE, type ObjectHead, type ObjectStorage } from '../src/storage/object-storage.js';
+import { OBJECT_STORAGE, ObjectTooLargeError, type ObjectHead, type ObjectStorage } from '../src/storage/object-storage.js';
 
 /** In-memory object storage: tests "upload" by calling `put`. */
 export class MemoryObjectStorage implements ObjectStorage {
   readonly bucket = 'test-bucket';
   readonly objects = new Map<string, ObjectHead>();
-  put(key: string, head: ObjectHead) {
+  readonly bodies = new Map<string, Buffer>();
+  put(key: string, head: ObjectHead, body?: Buffer) {
     this.objects.set(key, head);
+    if (body) this.bodies.set(key, body);
   }
   async presignPut(key: string) {
     return `https://storage.test/${key}?X-Amz-Signature=test`;
@@ -22,6 +24,13 @@ export class MemoryObjectStorage implements ObjectStorage {
   }
   async putObject(key: string, body: Buffer, contentType: string) {
     this.objects.set(key, { sizeBytes: body.length, contentType });
+    this.bodies.set(key, body);
+  }
+  async getObject(key: string, maxBytes: number) {
+    const body = this.bodies.get(key);
+    if (!body) throw new Error(`No object ${key}`);
+    if (body.length > maxBytes) throw new ObjectTooLargeError(maxBytes);
+    return body;
   }
   async head(key: string) {
     return this.objects.get(key) ?? null;
