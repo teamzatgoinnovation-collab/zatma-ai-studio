@@ -210,3 +210,4 @@ export const aiSettingsSchema = z
 export type AISettingsInput = z.infer<typeof aiSettingsSchema>;
 export * from './design.js';
 export * from './copy.js';
+export * from './crm.js';

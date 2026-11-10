@@ -81,6 +81,18 @@ Variant cards:
 * The length badge is neutral within limits, amber when longer than recommended, and red when over a hard platform limit. The detail line explains why in words, so the meaning does not rely on colour.
 * The rewrite and translate actions reuse the dialog and menu primitives. Rewrites can be undone on the card (in the editor, with Ctrl+Z).
 
+## CRM (Phase 7)
+
+`components/crm/`:
+* **`DataTable`:** a captioned `<table>` with a select-all checkbox and labelled row checkboxes.
+* **`FormSheet` / `RecordForm`:** a right-hand sheet with config-driven fields. Errors are linked to their fields through `aria-describedby`, and the duplicate warning shows above the form.
+* **`ActivityComposer`:** a radio group to pick the activity type. **`Timeline`:** Upcoming and History sections, with overdue and due badges.
+* **`PipelineBoard`:** each column is a `<section>` labelled with its stage, count and total.
+  * Cards can be dragged (HTML5) or moved with a "Move to" menu and Alt+←/→, so drag and drop is never the only way.
+  * Closing stages always confirm.
+
+Money uses `Intl.NumberFormat` (Indian grouping for INR, e.g. ₹1,50,000).
+
 ## Page states
 
 | State | Implementation |

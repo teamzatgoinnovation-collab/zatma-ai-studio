@@ -186,3 +186,51 @@ Error codes:
 * `NOTHING_TO_TRANSLATE` (422): the design has no text to translate.
 * `DESIGN_GENERATING` (409): the design is still being generated.
 * `AI_PROVIDER_UNAVAILABLE` (503) and `PLAN_LIMIT_REACHED` (402): as in Phase 4.
+
+## Phase 7 endpoints
+
+All CRM routes are under `/api/v1/crm` and scoped to the organization.
+
+**Who sees what:**
+* **Sales Agents** (`crm:write` without `crm:delete`) only see and change records they own. Other records return `404`.
+* Managers (`crm:delete`) and read-only roles see everything.
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/crm/summary` | `crm:read` | Leads by status, open pipeline value, won this month, follow-ups due today and overdue |
+| GET / POST | `/crm/leads` | read / write | List (`q`, `status`, `source`, `ownerId`, `tag`, `sort`, `order`, `page`, `pageSize`) / create. A duplicate email or phone → `409 DUPLICATE_RECORD` unless `allowDuplicate: true` |
+| GET | `/crm/leads/duplicates` | read | `?email&phone&excludeLeadId&excludeContactId` → matching leads and contacts |
+| GET | `/crm/leads/export.csv` | read | CSV of the filtered list (formula-safe, UTF-8 BOM) |
+| POST | `/crm/leads/bulk` | write | `{ ids, action: assign \| status \| tag \| delete, … }` (delete needs `crm:delete`) |
+| GET / PATCH / DELETE | `/crm/leads/:id` | read / write / delete | Get, update, soft delete |
+| GET | `/crm/leads/:id/timeline` | read | Activities and deals |
+| POST | `/crm/leads/:id/convert` | write | `{ createCompany, createDeal, dealName?, dealValue?, pipelineId? }` → `{ lead, contact, deal }` |
+| GET / POST | `/crm/contacts` | read / write | List (`lifecycle`, `companyId`, …) / create |
+| GET | `/crm/customers` | read | Contacts with lifecycle CUSTOMER and their `wonValue` |
+| GET / PATCH / DELETE | `/crm/contacts/:id` | read / write / delete | Contact, plus `/timeline` and `/export.csv` on the collection |
+| GET / POST | `/crm/companies` | read / write | List / create (also `/export.csv`) |
+| GET / PATCH / DELETE | `/crm/companies/:id` | read / write / delete | Company, plus `/timeline` (activities, deals, contacts) |
+| GET / POST | `/crm/pipelines` | read / delete | Pipelines with stages (the default is created on first use) / create |
+| GET | `/crm/pipelines/:id/board` | read | Kanban columns with deals, counts and totals (`ownerId`, `q`) |
+| PATCH / DELETE | `/crm/pipelines/:id` | delete | Rename or make default / delete (empty, non-default) |
+| POST / PATCH / DELETE | `/crm/pipelines/:id/stages[/:stageId]` | delete | Add, edit, delete (`?moveDealsTo=` when not empty). Reorder with `POST …/stages/reorder { stageIds }` |
+| GET / POST | `/crm/deals` | read / write | List (`status`, `pipelineId`, `stageId`, `contactId`, `companyId`, …) / create (also `/export.csv`) |
+| GET / PATCH / DELETE | `/crm/deals/:id` | read / write / delete | Deal, plus `/timeline` |
+| POST | `/crm/deals/:id/move` | write | `{ stageId, beforeId?, lostReason? }`. Won and Lost stages close the deal; Lost needs a reason (`LOST_REASON_REQUIRED`) |
+| GET / POST | `/crm/activities` | read / write | List (`type`, `status`, `ownerId`, record ids, `q`) / create (linked to at least one record; tasks and follow-ups need `dueAt`) |
+| PATCH / DELETE | `/crm/activities/:id` | write | Update or complete (`completed: true`) / delete |
+| GET | `/crm/follow-ups` | read | `?range=overdue\|today\|week\|all&owner=me\|all&tz=` open items by due date |
+| POST | `/crm/import/preview` | write | `{ fileId, entity }` → headers, sample rows, row count, suggested mapping |
+| POST | `/crm/import` | write | `{ fileId, entity, mapping, dedupe: skip\|update\|create, tag? }` → `202` job |
+| GET | `/crm/import/:id` | read | `{ status, total, processed, created, updated, skipped, errors[] }` |
+
+Error codes:
+* `DUPLICATE_RECORD` (409, `details.duplicates`).
+* `ALREADY_CONVERTED` (409).
+* `CANNOT_ASSIGN` (403, a Sales Agent assigning to someone else).
+* `INVALID_OWNER` (422).
+* `NOT_OWNER` (403, editing a colleague's company).
+* `STAGE_NOT_EMPTY`, `STAGE_REQUIRED`, `DEFAULT_PIPELINE`, `PIPELINE_NOT_EMPTY` (409).
+* `INVALID_STAGE`, `LOST_REASON_REQUIRED` (422).
+* `INVALID_FILE`, `FILE_TOO_LARGE`, `INVALID_CSV`, `INVALID_MAPPING` (422).
+* `PLAN_LIMIT_REACHED` (402, metric `crmRecords`).

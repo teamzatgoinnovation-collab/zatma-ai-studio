@@ -51,18 +51,19 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 | `copy_asset` | ✅ P6 | organizationId, workspaceId, kind, content, hashtags[], language, tone, platform, goal, audience, brief, variants (JSON), favorite, brandKitId?, sourceDesignId?, campaignId? (FK in P12), createdById, deletedAt |
 | `video` | P16 | organizationId, script, storyboard, fileId, status, durationSec |
 
-## CRM (planned, Phase 7–8)
+## CRM (Phase 7)
 
 | Table | Key fields |
 |---|---|
-| `lead` | organizationId, firstName, lastName, company, email, phone, whatsapp, website, industry, jobTitle, source, status, score, scoreReason, ownerId, tags, lastContactAt, nextFollowUpAt, convertedContactId |
-| `contact` | organizationId, companyId?, names, email, phone, whatsapp, lifecycle (LEAD/CUSTOMER), customFields |
-| `company` | organizationId, name, website, industry, size, address, country, phone, email |
-| `pipeline`, `pipeline_stage` | organizationId, name, order, probability |
-| `deal` | organizationId, name, companyId, contactId, value, currency, pipelineId, stageId, expectedCloseAt, ownerId, probability, source, status (OPEN/WON/LOST) |
-| `activity` | organizationId, type (CALL/EMAIL/MEETING/WHATSAPP/TASK/NOTE/FOLLOW_UP), subject, body, dueAt, completedAt, ownerId, polymorphic link (leadId/contactId/companyId/dealId) |
-| `tag`, `segment` | organizationId, name, definition (JSON filter) |
-| `consent` | organizationId, contactId, channel, status, source, capturedAt (Phase 14 compliance) |
+| `lead` ✅ | organizationId, firstName, lastName, email/emailNormalized, phone/phoneNormalized, whatsapp, jobTitle, company, website, industry, city, country, status, source, sourceDetail, notes, tags[], customFields, ownerId, score/scoreReason (P8), lastContactedAt, nextFollowUpAt, convertedContactId/DealId/At, deletedAt |
+| `contact` ✅ | organizationId, companyId?, firstName, lastName, email/phone (+ normalized), whatsapp, jobTitle, lifecycle (LEAD/PROSPECT/CUSTOMER/CHURNED), source, notes, tags[], customFields, ownerId, lastContactedAt, nextFollowUpAt, consent (P14), deletedAt |
+| `company` ✅ | organizationId, name, nameNormalized, website, industry, size, phone, email, address, city, country, tags[], customFields, ownerId, deletedAt |
+| `pipeline`, `pipeline_stage` ✅ | organizationId, name, isDefault / pipelineId, name, order, probability, kind (OPEN/WON/LOST) |
+| `deal` ✅ | organizationId, name, value Decimal(14,2), currency, pipelineId, stageId, position (float), probability, status (OPEN/WON/LOST), lostReason, expectedCloseAt, closedAt, source, contactId?, companyId?, leadId?, tags[], notes, ownerId, deletedAt |
+| `activity` ✅ | organizationId, type (CALL/EMAIL/MEETING/WHATSAPP/NOTE/TASK/FOLLOW_UP), subject, body, dueAt, completedAt, priority, outcome, ownerId, createdById, leadId/contactId/companyId/dealId, deletedAt |
+| `crm_import` ✅ | organizationId, userId, entity, fileId, options, status, total/processed/created/updated/skipped, errors (JSON), error |
+| `segment` | organizationId, name, definition (JSON filter) (planned, P12/P14) |
+| `consent` | organizationId, contactId, channel, status, source, capturedAt (planned, P14 compliance) |
 
 ## Marketing, social & ads (planned)
 

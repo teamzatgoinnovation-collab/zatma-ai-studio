@@ -36,6 +36,13 @@ model User {
   designs        Design[]
   designVersions DesignVersion[]
   copyAssets     CopyAsset[]
+  ownedLeads     Lead[]          @relation("LeadOwner")
+  ownedContacts  Contact[]       @relation("ContactOwner")
+  ownedCompanies Company[]       @relation("CompanyOwner")
+  ownedDeals     Deal[]          @relation("DealOwner")
+  activities     Activity[]      @relation("ActivityOwner")
+  createdActs    Activity[]      @relation("ActivityCreator")
+  crmImports     CrmImport[]
 
   @@map("user")
 }
@@ -120,6 +127,13 @@ model Organization {
   designs        Design[]
   templates      Template[]
   copyAssets     CopyAsset[]
+  leads          Lead[]
+  contacts       Contact[]
+  companies      Company[]
+  pipelines      Pipeline[]
+  deals          Deal[]
+  activities     Activity[]
+  crmImports     CrmImport[]
   invoices       Invoice[]
   payments       Payment[]
 
@@ -598,4 +612,305 @@ model CopyAsset {
   @@index([organizationId, updatedAt])
   @@index([organizationId, kind])
   @@map("copy_asset")
+}
+
+// ───────────────────────────── CRM (Phase 7) ─────────────────────────────
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  UNQUALIFIED
+  CONVERTED
+  LOST
+}
+
+enum Lifecycle {
+  LEAD
+  PROSPECT
+  CUSTOMER
+  CHURNED
+}
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+}
+
+enum StageKind {
+  OPEN
+  WON
+  LOST
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  NOTE
+  TASK
+  FOLLOW_UP
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Company {
+  id             String    @id @default(uuid(7))
+  organizationId String
+  name           String
+  nameNormalized String?
+  website        String?
+  industry       String?
+  size           String?
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  country        String?
+  tags           String[]  @default([])
+  customFields   Json      @default("{}")
+  ownerId        String?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User?        @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  contacts     Contact[]
+  deals        Deal[]
+  activities   Activity[]
+
+  @@index([organizationId, ownerId])
+  @@index([organizationId, nameNormalized])
+  @@map("company")
+}
+
+model Contact {
+  id              String    @id @default(uuid(7))
+  organizationId  String
+  companyId       String?
+  firstName       String
+  lastName        String?
+  email           String?
+  emailNormalized String?
+  phone           String?
+  phoneNormalized String?
+  whatsapp        String?
+  jobTitle        String?
+  lifecycle       Lifecycle @default(PROSPECT)
+  source          String    @default("other")
+  notes           String?
+  tags            String[]  @default([])
+  customFields    Json      @default("{}")
+  ownerId         String?
+  lastContactedAt DateTime?
+  nextFollowUpAt  DateTime?
+  /// Marketing consent per channel (Phase 14)
+  consent         Json?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  owner        User?        @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  deals        Deal[]
+  activities   Activity[]
+  leads        Lead[]
+
+  @@index([organizationId, ownerId])
+  @@index([organizationId, lifecycle])
+  @@index([organizationId, emailNormalized])
+  @@index([organizationId, phoneNormalized])
+  @@map("contact")
+}
+
+model Lead {
+  id                 String     @id @default(uuid(7))
+  organizationId     String
+  firstName          String
+  lastName           String?
+  email              String?
+  emailNormalized    String?
+  phone              String?
+  phoneNormalized    String?
+  whatsapp           String?
+  jobTitle           String?
+  company            String?
+  website            String?
+  industry           String?
+  city               String?
+  country            String?
+  status             LeadStatus @default(NEW)
+  source             String     @default("other")
+  sourceDetail       String?
+  notes              String?
+  tags               String[]   @default([])
+  customFields       Json       @default("{}")
+  ownerId            String?
+  /// AI lead score (Phase 8)
+  score              Int?
+  scoreReason        String?
+  lastContactedAt    DateTime?
+  nextFollowUpAt     DateTime?
+  convertedContactId String?
+  convertedDealId    String?
+  convertedAt        DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner            User?        @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  convertedContact Contact?     @relation(fields: [convertedContactId], references: [id], onDelete: SetNull)
+  activities       Activity[]
+  deals            Deal[]
+
+  @@index([organizationId, ownerId])
+  @@index([organizationId, status])
+  @@index([organizationId, emailNormalized])
+  @@index([organizationId, phoneNormalized])
+  @@map("lead")
+}
+
+model Pipeline {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  name           String
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stages       PipelineStage[]
+  deals        Deal[]
+
+  @@index([organizationId])
+  @@map("pipeline")
+}
+
+model PipelineStage {
+  id             String    @id @default(uuid(7))
+  organizationId String
+  pipelineId     String
+  name           String
+  order          Int
+  probability    Int       @default(0)
+  kind           StageKind @default(OPEN)
+  createdAt      DateTime  @default(now())
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals    Deal[]
+
+  @@index([pipelineId, order])
+  @@map("pipeline_stage")
+}
+
+model Deal {
+  id              String     @id @default(uuid(7))
+  organizationId  String
+  name            String
+  value           Decimal    @default(0) @db.Decimal(14, 2)
+  currency        String     @default("INR")
+  pipelineId      String
+  stageId         String
+  /// Order within the stage column (fractional for cheap inserts)
+  position        Float      @default(0)
+  probability     Int        @default(0)
+  status          DealStatus @default(OPEN)
+  lostReason      String?
+  expectedCloseAt DateTime?
+  closedAt        DateTime?
+  source          String?
+  contactId       String?
+  companyId       String?
+  leadId          String?
+  tags            String[]   @default([])
+  notes           String?
+  ownerId         String?
+  deletedAt       DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pipeline     Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stage        PipelineStage @relation(fields: [stageId], references: [id])
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  lead         Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  owner        User?         @relation("DealOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  activities   Activity[]
+
+  @@index([organizationId, ownerId])
+  @@index([organizationId, status])
+  @@index([stageId, position])
+  @@map("deal")
+}
+
+model Activity {
+  id             String       @id @default(uuid(7))
+  organizationId String
+  type           ActivityType
+  subject        String
+  body           String?
+  dueAt          DateTime?
+  completedAt    DateTime?
+  priority       Priority     @default(MEDIUM)
+  outcome        String?
+  ownerId        String?
+  createdById    String?
+  leadId         String?
+  contactId      String?
+  companyId      String?
+  dealId         String?
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User?        @relation("ActivityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy    User?        @relation("ActivityCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company      Company?     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deal         Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, ownerId, dueAt])
+  @@index([leadId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([dealId])
+  @@map("activity")
+}
+
+/// CSV import runs (processed by the `crm-import` queue).
+model CrmImport {
+  id             String           @id @default(uuid(7))
+  organizationId String
+  userId         String?
+  entity         String
+  fileId         String
+  options        Json
+  status         GenerationStatus @default(QUEUED)
+  total          Int              @default(0)
+  processed      Int              @default(0)
+  created        Int              @default(0)
+  updated        Int              @default(0)
+  skipped        Int              @default(0)
+  errors         Json             @default("[]")
+  error          String?
+  createdAt      DateTime         @default(now())
+  completedAt    DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("crm_import")
 }

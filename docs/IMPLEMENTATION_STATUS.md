@@ -8,8 +8,8 @@
 | 3 | Modern SaaS UI/UX | ✅ Completed |
 | 4 | AI provider integration | ✅ Completed |
 | 5 | AI Design Studio | ✅ Completed |
-| 6 | AI Copywriter | ✅ Completed (awaiting approval for Phase 7) |
-| 7 | CRM core | ⏳ Pending |
+| 6 | AI Copywriter | ✅ Completed |
+| 7 | CRM core | ✅ Completed (awaiting approval for Phase 8) |
 | 8 | AI lead scoring & intelligence | ⏳ Pending |
 | 9 | Social media account integration | ⏳ Pending |
 | 10 | Social content management | ⏳ Pending |
@@ -482,3 +482,105 @@ The 9 copy e2e tests cover:
 
 ### Next phase
 **Phase 7: CRM core.** Leads, contacts, companies, customers, deals, a drag-and-drop sales pipeline, activities and follow-ups, with import/export, duplicate detection, assignment and full activity history.
+
+## Phase 7: CRM core (✅ Completed)
+
+### Features implemented
+* **Shared CRM model** (`packages/validation/src/crm.ts`):
+  * Lead statuses, sources, lifecycles, deal statuses, stage kinds, activity types and priorities.
+  * Strict create, update and list schemas with search, filters and sorting.
+  * **Phone numbers** are normalised to the international (E.164) format. The organization's currency sets the default country code: +91 for INR, +971 for AED, +966 for SAR, and so on. This handles trunk zeros (098… / 050…) and the 00 prefix.
+  * **Duplicate keys:** emails are normalised, and company names are compared without legal suffixes (Pvt Ltd, LLP, LLC, FZE, W.L.L …).
+  * **CSV:** an RFC 4180 parser (quotes, newlines in fields, BOM, comma or semicolon), capped at 5,000 rows and 2 MB; an exporter that neutralises spreadsheet formulas; and automatic column mapping from common header names.
+* **API** (`apps/api/src/crm/`):
+  * **Leads:** CRUD, filters (status, source, owner, tag, search), bulk status / assign / tag / delete.
+  * **Duplicate detection:** creating a lead or contact whose email or phone already exists returns 409 `DUPLICATE_RECORD` with the matches; `allowDuplicate` overrides it. A lookup endpoint lets forms warn early.
+  * **Lead conversion** (one transaction): creates or links a contact (matched by email or phone) and a company (matched by name), optionally creates a deal in the first stage of the default pipeline, moves the lead's activities across, and marks the lead CONVERTED.
+  * **Contacts and companies:** CRUD and timelines. **Customers** are contacts with lifecycle CUSTOMER, shown with their lifetime won value.
+  * **Pipelines:** a default pipeline is created on first use (New Lead → Contacted → Qualified → Proposal → Negotiation → Won / Lost). Stages can be added, edited and reordered; a stage can only be deleted when it is empty, or after its deals are moved.
+  * **Deals:**
+    * CRUD.
+    * A Kanban board with counts and value totals per column.
+    * Moves use fractional positions, renumbering a column when needed.
+    * Won and Lost stages close the deal (status, probability, close date); a lost deal needs a reason.
+    * Winning a deal makes its contact a customer.
+  * **Activities:**
+    * Types: call, WhatsApp, email, meeting, note, task and follow-up.
+    * Logging a contact activity sets "last contacted" and moves a NEW lead to CONTACTED.
+    * Open tasks keep "next follow-up" up to date.
+    * Follow-ups are listed by overdue / today / next 7 days / all, using the user's time zone.
+  * **CSV import:** preview with automatic mapping; the job runs on the BullMQ `crm-import` queue as the importing user; duplicates can be skipped, have their empty fields filled in, or be created anyway; errors are recorded per row; the plan limit is enforced; progress can be polled.
+  * **CSV export** for leads, contacts, companies and deals, respecting the current filters and the user's visibility.
+  * **Summary:** leads by status, open pipeline value, deals won this month, follow-ups due today and overdue.
+  * Every write is audited.
+* **Record visibility:**
+  * Owner, Admin and CRM Manager see and manage everything.
+  * **Sales Agents** see and edit only records they own: other records return 404, they cannot reassign, and everything they create is owned by them.
+  * Read-only roles see everything but cannot change it.
+  * Companies are shared reference data that everyone can see; Sales Agents can edit only the ones they own.
+* **Plan limit:** a new `crmRecords` entitlement (contacts + leads): Free 500, Starter 5,000, Professional 25,000, Business 100,000, Agency unlimited. It is enforced on create and import, and shown on the Billing usage page.
+* **Web** (`/crm/*`, all live):
+  * **Overview:** stats and leads-by-status bars.
+  * **Lists:** Leads, Contacts, Customers, Companies and Deals, with search, filters, owner filter (managers), pagination, CSV export, and bulk status / assign / delete on leads.
+  * **Create/edit sheets:** field errors, a duplicate warning on blur with "Create anyway", and an owner picker (managers only; defaults to the current user).
+  * **CSV import dialog:** upload → column mapping → duplicate policy and tag → progress → result with per-row errors.
+  * **Detail pages** for leads, contacts and companies:
+    * Fields, plus Call / WhatsApp (`wa.me`) / Email quick actions.
+    * An activity composer (log call / WhatsApp / email / meeting / note, or schedule a follow-up) and a timeline.
+    * Convert (contact, company and deal), and delete for managers.
+  * **Sales Pipeline:** a Kanban with native drag and drop, a "Move to" menu and Alt+←/→ keyboard moves; confirmation for Won and a reason for Lost; column totals; owner filter and search; a deal side panel with its own timeline.
+  * **Activities** list and **Follow-ups:** Overdue / Today / Next 7 days / All, with complete and reopen.
+
+### Database changes
+Migration `20261109110234_phase7_crm`:
+* New tenant-scoped tables `company`, `contact`, `lead`, `pipeline`, `pipeline_stage`, `deal`, `activity` and `crm_import`, with enums for status, lifecycle, stage kind, activity type and priority.
+* Duplicate-key and owner indexes, and soft delete everywhere.
+* `lead.score` / `scoreReason` are reserved for Phase 8 and `contact.consent` for Phase 14.
+* A data update adds `crmRecords` to every plan's limits.
+
+### APIs
+See `API_DOCUMENTATION.md` → Phase 7 endpoints.
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Validation unit (phone/email/company normalisation, CSV parse/export, auto-mapping, schemas) | ✅ 24 passed (10 new) |
+| API unit (visibility scope, Kanban positions, import helpers, time zones) | ✅ 76 passed (5 new) |
+| API e2e | ✅ 86 passed (7 new CRM) |
+| Web unit (money/date/query helpers, Kanban reorder, nav) | ✅ 55 passed (4 new) |
+| Lint, typecheck, build | ✅ |
+
+The CRM e2e tests cover:
+* Lead CRUD, filters and search.
+* Duplicates in another phone format (409, and `allowDuplicate`).
+* Activities updating the dates and status; follow-up ranges.
+* Conversion with company re-use and moved history.
+* Pipeline moves, ordering, totals, win → customer, and the lost reason.
+* Stage rules.
+* CSV import with mapping, skipped duplicates, per-row errors and formula-safe export.
+* The plan limit on create and import.
+* Sales Agent visibility, assignment and delete rules; Viewer read-only; CRM Manager delete.
+* Tenant isolation for every entity.
+
+**Browser run (Playwright, production build, real local services):** 25 checks passed with no console errors.
+* A lead created from the sheet is owned by its creator.
+* A duplicate warning appears for the same phone typed differently, and creating it is blocked with "Create anyway".
+* CSV import of Kerala and UAE leads: columns mapped automatically, 4 created and 1 duplicate skipped.
+* The source filter and CSV export work.
+* The WhatsApp link opens `wa.me/91…`.
+* Logging WhatsApp moved the lead to Contacted, and a follow-up was scheduled.
+* Converting created a contact, company and ₹1,50,000 deal, with the history moved.
+* Dragging the deal to Proposal, then Won, made the contact a customer.
+* The follow-up appeared under "Next 7 days" and was completed.
+* A Sales Agent sees only their own lead and has no owner picker.
+* axe found no serious or critical violations on the import dialog, leads, lead detail, pipeline (light and dark), follow-ups and overview.
+* No horizontal scroll on mobile.
+
+### Remaining issues / notes
+* **Not included here:** AI lead scoring and next-best-action are Phase 8. Sending WhatsApp, email and SMS from the CRM is Phase 14; the quick actions open the user's own phone, WhatsApp or email app.
+* **Custom fields** are stored and returned by the API, but there is no UI yet to define or edit them.
+* **Companies are visible to Sales Agents** (shared reference data) even when owned by a colleague; their contacts and deals stay owner-scoped.
+* **Imports** are capped at 5,000 rows and 2 MB per file. Larger files must be split.
+
+### Next phase
+**Phase 8: AI lead scoring & intelligence.** Explainable, configurable lead scores using the fields reserved in this phase, next-best-action suggestions and AI-drafted follow-up messages.

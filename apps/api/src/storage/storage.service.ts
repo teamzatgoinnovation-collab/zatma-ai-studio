@@ -88,6 +88,12 @@ export class StorageService {
     return file;
   }
 
+  /** Reads an uploaded file's bytes (server-side processing such as CSV import). */
+  async readUploaded(id: string, maxBytes: number): Promise<{ file: StoredFile; body: Buffer }> {
+    const file = await this.getUploaded(id);
+    return { file, body: await this.storage.getObject(file.key, maxBytes) };
+  }
+
   async downloadUrl(id: string): Promise<{ url: string; expiresInSeconds: number }> {
     const file = await this.getUploaded(id);
     return { url: await this.storage.presignGet(file.key, DOWNLOAD_URL_TTL_SECONDS), expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS };

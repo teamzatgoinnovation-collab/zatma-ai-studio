@@ -2,7 +2,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { MissingTenantError, TenantContext, TenantMismatchError } from '../common/tenant-context.js';
 
 /** Models whose rows belong to exactly one organization. Every new tenant model must be added here. */
-export const TENANT_MODELS = new Set<string>(['Workspace', 'StoredFile', 'AiUsage', 'AuditLog', 'Invoice', 'Payment', 'GenerationJob', 'BrandKit', 'Design', 'DesignVersion', 'Template', 'CopyAsset']);
+export const TENANT_MODELS = new Set<string>(['Workspace', 'StoredFile', 'AiUsage', 'AuditLog', 'Invoice', 'Payment', 'GenerationJob', 'BrandKit', 'Design', 'DesignVersion', 'Template', 'CopyAsset', 'Company', 'Contact', 'Lead', 'Pipeline', 'PipelineStage', 'Deal', 'Activity', 'CrmImport']);
 
 const WHERE_OPERATIONS = new Set([
   'findUnique',
