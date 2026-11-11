@@ -61,6 +61,17 @@ describe('CRM core (e2e)', () => {
     await api(app, owner).post('/crm/leads', { firstName: '' }).expect(400);
   });
 
+  it('partial updates leave omitted fields untouched', async () => {
+    const lead = (await api(app, owner).post('/crm/leads', { firstName: 'Patch', status: 'QUALIFIED', source: 'referral', tags: ['vip'], customFields: { budget: '5L' } }).expect(201)).body;
+    const updated = (await api(app, owner).patch(`/crm/leads/${lead.id}`, { firstName: 'Patched' }).expect(200)).body;
+    expect(updated).toMatchObject({ firstName: 'Patched', status: 'QUALIFIED', source: 'referral', tags: ['vip'], customFields: { budget: '5L' } });
+    const pipeline = (await api(app, owner).get('/crm/pipelines').expect(200)).body[0];
+    const won = pipeline.stages.find((st: { kind: string }) => st.kind === 'WON');
+    const renamed = (await api(app, owner).patch(`/crm/pipelines/${pipeline.id}/stages/${won.id}`, { name: 'Closed won' }).expect(200)).body;
+    expect(renamed.stages.find((st: { id: string }) => st.id === won.id)).toMatchObject({ name: 'Closed won', kind: 'WON' });
+    await api(app, owner).patch(`/crm/pipelines/${pipeline.id}/stages/${won.id}`, { name: won.name }).expect(200);
+  });
+
   it('logs activities, tracks follow-ups and converts a lead into contact, company and deal', async () => {
     const lead = (await api(app, owner).post('/crm/leads', { firstName: 'Fathima', email: 'fathima@kochibakes.in', company: 'Kochi Bakes LLP', phone: '0484 2345678' }).expect(201)).body;
     await api(app, owner).post('/crm/activities', { type: 'WHATSAPP', subject: 'Sent brochure', leadId: lead.id }).expect(201);

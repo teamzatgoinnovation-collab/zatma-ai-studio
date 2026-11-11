@@ -73,14 +73,17 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 | `social_account` ✅ | organizationId, connectionId → social_connection (cascade), platform (FACEBOOK_PAGE/INSTAGRAM_BUSINESS/LINKEDIN_PAGE/YOUTUBE_CHANNEL), externalId, name, username, avatarUrl, accountTokenEncrypted? (Meta Page token), capabilities (JSON), status (ACTIVE/NEEDS_REAUTH/ERROR/DISCONNECTED), lastCheckedAt, lastError, workspaceIds[] (empty = all), connectedById. Unique (organizationId, platform, externalId) |
 | `social_webhook_event` ✅ | provider, object, objectId, field, payload (JSON), receivedAt, processedAt. Platform-level (not tenant-scoped), consumed by Phases 10 and 13 |
 
+| `social_post` ✅ (P10) | organizationId, workspaceId, caption, hashtags[], media (JSON: file id, kind, type, size, dimensions, duration, alt text), status, scheduledAt, timezone, publishedAt, sourceDesignId?, copyAssetId?, campaignId? (P12), createdById, submittedAt, approvedById/At, reviewNote, revision, deletedAt |
+| `social_post_target` ✅ (P10) | organizationId, postId (cascade), socialAccountId? (set null on disconnect), platform, accountName (snapshot), captionOverride, options (JSON), status, attempts, providerState (JSON resumable progress), externalId, externalUrl, error, errorCode, lastAttemptAt, nextAttemptAt, publishedAt. Unique (postId, socialAccountId) |
+
+`organization.socialSettings` (JSON) holds `{ requireApproval }`. Plan limits gained `postsPerMonth` (Free 10, Starter 60, Professional 300, Business 1,500, Agency unlimited).
+
 Encrypted columns use AES-256-GCM with the row's identity as associated data (see SECURITY.md).
 
 ## Marketing, social & ads (planned)
 
 | Table | Phase | Key fields |
 |---|---|---|
-| `social_post` | P10 | organizationId, campaignId?, caption, mediaFileIds, status, scheduledAt, timezone |
-| `social_post_target` | P10 | postId, socialAccountId, externalPostId, status, error, publishedAt |
 | `ad_account`, `ad_campaign`, `ad_set`, `ad` | P11 | organizationId, platform ids, objective, budget, status (mirrors the platform) |
 | `campaign` | P12 | organizationId, name, type, objective, audience, startAt, endAt, budget, status, ownerId |
 | `automation`, `automation_node`, `automation_run`, `automation_run_step` | P13 | graph JSON, trigger, run logs |

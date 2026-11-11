@@ -11,8 +11,8 @@
 | 6 | AI Copywriter | ✅ Completed |
 | 7 | CRM core | ✅ Completed |
 | 8 | AI lead scoring & intelligence | ✅ Completed |
-| 9 | Social media account integration | ✅ Completed (awaiting approval for Phase 10; real accounts need app keys) |
-| 10 | Social content management | ⏳ Pending |
+| 9 | Social media account integration | ✅ Completed (real accounts need app keys) |
+| 10 | Social publishing & content calendar | ✅ Completed (awaiting approval for Phase 11; live posting needs platform keys and App Review) |
 | 11 | Meta Ads manager | ⏳ Pending |
 | 12 | Campaign management | ⏳ Pending |
 | 13 | Marketing automation | ⏳ Pending |
@@ -745,3 +745,108 @@ The 9 social e2e tests cover:
 
 ### Next phase
 **Phase 10: Social content management.** Compose posts with platform previews and validation, a content calendar, scheduling, and publishing to the accounts connected here, with status tracking and retries.
+
+## Phase 10: Social publishing & content calendar (✅ Completed; platform keys pending)
+
+### Features implemented
+* **Publishing to Facebook Pages, Instagram Business, LinkedIn Pages and YouTube** through each platform's official API (see INTEGRATIONS → Social publishing).
+  * Supported: text, a single image, multi-image (Facebook up to 10, Instagram carousel 2–10, LinkedIn up to 20) and video (Facebook video, Instagram Reels, LinkedIn video, YouTube upload).
+  * Every step saves its progress (`providerState`), so retries resume instead of re-posting.
+* **Composer** (`/marketing/social/new`):
+  * Choose accounts (filtered by workspace; accounts needing reconnection are disabled).
+  * Write once with hashtag chips; customise the text per account; YouTube title, visibility and made-for-kids.
+  * **Media:**
+    * Upload images or video; dimensions and duration are read in the browser, and PNG/WebP are converted to JPEG so they work on Instagram.
+    * **Add design** renders a saved design at full size off-screen with the editor's canvas and adds it as a JPEG.
+    * Alt text for each image.
+  * **Insert copy** from the AI Copywriter library.
+  * **Live checks** with the shared platform rules: character limits counted in graphemes, so Malayalam counts correctly; hashtags; media counts, types, aspect ratio and duration. Problems block publishing; warnings only inform.
+  * Platform-shaped previews showing where each feed cuts the text ("…more").
+* **Actions:**
+  * Save draft; Submit for approval.
+  * Schedule, in the organization's time zone, with the user's local time shown when it differs.
+  * **Publish now**, behind a confirmation that lists the accounts.
+* **Approval workflow:**
+  * Designers draft and submit; managers approve or request changes, with a note and an email to the author.
+  * **Settings → Publishing** can require approval for everyone. No self-approval except Owner and Admin, and editing an approved post needs approval again.
+* **Post page:** per-account status, live links ("View post"), the failure reason and **Retry**, Unschedule, Duplicate, Delete. It refreshes while publishing.
+* **Posts list:** tabs (All, Drafts, Pending approval, Scheduled, Published, Failed) and the monthly quota meter.
+* **Content calendar:**
+  * Month, Week, Day and List views in the organization's time zone, with workspace and platform filters.
+  * **Drag a scheduled post to another day** (the time is kept), or use the keyboard-accessible "Reschedule" button on each post.
+  * "+" on any future day starts a post for 10:00 that day.
+* **Marketing overview** (`/marketing`): scheduled in the next 7 days, posts this month, waiting for approval, accounts and failed posts needing attention, and an "Up next" list. The Marketing section is now live in the navigation.
+* **Entry points:** "Schedule post" in the design editor and on copy library items.
+* **Queue and reliability:**
+  * The `social-publish` queue runs delayed jobs per post and one job per account.
+  * Retries back off over 30 s, 2 min, 8 min and 32 min (5 attempts).
+  * One publish at a time per account; a sweeper every minute; compare-and-set locks; audit entries and failure emails.
+* **Plan limit:** `postsPerMonth` counts published plus scheduled posts per account per UTC month (Free 10, Starter 60, Professional 300, Business 1,500, Agency unlimited). It is checked when scheduling, publishing and retrying.
+* **Also fixed: a data-loss bug in earlier phases.**
+  * Cause: Zod 4 still applies `.default()` inside `.partial()`.
+  * Effect: `PATCH /crm/leads/:id { firstName }` silently reset the lead's status to New, its source to Other, and cleared its tags and custom fields. Contacts, companies, deals and pipeline stages (a Won stage reverted to Open) were affected the same way.
+  * Fix: the new `withoutDefaults()` helper. A scan confirms no update schema injects defaults any more; scoring settings are a full replace by design.
+
+### Database changes
+Migration `20261111052314_phase10_social_publishing`:
+* Enums `SocialPostStatus` and `SocialPostTargetStatus`.
+* Tables `social_post` and `social_post_target` (tenant-scoped).
+* `organization.socialSettings`.
+* Plan limits updated with `postsPerMonth`.
+
+### APIs
+See `API_DOCUMENTATION.md` → Phase 10 endpoints. New env `YOUTUBE_UPLOAD_URL` (default `https://www.googleapis.com/upload/youtube/v3`). The upload purpose `POST_MEDIA` allows images up to 20 MB and MP4/MOV videos up to 250 MB.
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Validation unit | ✅ 48 passed (14 new) |
+| API unit | ✅ 103 passed (12 new) |
+| API e2e | ✅ 111 passed (9 new) |
+| Web unit | ✅ 64 passed (5 new) |
+| Lint, typecheck, build | ✅ |
+
+**Validation unit tests:**
+* Every platform rule, grapheme counting, hashtags (including Malayalam combining marks), media kinds and counts, aspect ratio, Reel duration, and the YouTube fields.
+* Schedule and calendar bounds, time zones (IST, Gulf Standard Time and London across the clock change), the quota window, upload size and type per purpose.
+* PATCH schemas don't inject defaults.
+
+**API unit tests:** each adapter against a fake `fetch`:
+* Facebook multi-photo that resumes without re-uploading.
+* Instagram carousel, polling while processing, a single publish, expired-container restart, and permanent errors.
+* LinkedIn little-text escaping, image upload, and multipart video resuming after a failed part.
+* YouTube chunked upload that resumes from the stored session, and a new session after expiry.
+* Error classification.
+
+**API e2e tests:**
+* Settings per role.
+* Drafts: workspace and account checks, media from storage only, a caption-only edit keeping accounts and media, dry-run validation, duplicate, delete.
+* Publish now needs `confirm`, then reaches all four platforms; usage counts.
+* Schedule, reschedule (old job removed), cancel, calendar range.
+* The full approval flow, including emails and self-approval rules.
+* Partial failure, then a retry without re-posting.
+* Transient error retried with saved progress; Instagram processing; token error leading to *Reconnect needed* and an email.
+* The sweeper recovers a lost job.
+* Quota 402, tenant isolation, read-only Viewer.
+* No tokens in responses.
+* New CRM regression test: partial updates keep status, source, tags, custom fields and stage kind.
+
+**Browser run** (Playwright, production build, real BullMQ workers, API pointed at the extended local stand-in): **34 checks passed with no console errors.**
+* Design rendered at 1080×1080 and published to Facebook (the photo fetched from storage), Instagram and LinkedIn (hashtag markup); live links appeared.
+* YouTube resumable upload of a real MP4 (65,496 bytes received).
+* Instagram text-only blocked live.
+* Forced LinkedIn failure: *Partly published*, the reason shown and emailed, then Retry published it.
+* A Designer submitted; the Owner approved (author emailed) and scheduled it, and the queue published it on time.
+* Calendar drag moved a post to the next day at the same time.
+* axe found no serious or critical violations on the composer, published and partly-published post pages, calendar (month, list, dark), overview, publishing settings and posts list.
+* No horizontal scroll on the mobile composer or calendar.
+* Found and fixed during the run: the calendar month title showed the first grid cell's month ("October" on 11 November).
+
+### Remaining issues / notes
+* **Live platforms not tested yet.** Publishing needs the app keys from Phase 9 plus App Review (`pages_manage_posts`, `instagram_content_publish`), LinkedIn `w_organization_social`, and YouTube consent-screen verification and quota.
+* **Production storage must be internet-reachable** (Cloudflare R2 or S3) so Meta can fetch media from signed URLs.
+* **Not included yet:** Instagram video carousels, first comments, location and user tags, thumbnails and captions for videos, and per-post analytics (Phase 17).
+* **Monthly quota boundaries** are in UTC; schedules for later months are counted when that month starts.
+
+### Next phase
+**Phase 11: Meta Ads manager.** Ad account connection, an AI campaign builder (objective, audience, budget, creative from designs and copy), and campaign, ad set and ad management with insights. **Nothing will spend money without explicit approval.**

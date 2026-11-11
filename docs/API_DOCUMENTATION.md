@@ -272,3 +272,31 @@ Error codes: `AI_PROVIDER_UNAVAILABLE` (503), `PLAN_LIMIT_REACHED` (402), `AI_OU
 | GET | `/social/meta/data-deletion/:code` | public | Deletion status page for Meta |
 
 Error codes: `SOCIAL_PROVIDER_NOT_CONFIGURED` (503), `SOCIAL_REAUTH_REQUIRED` (409), `SOCIAL_PROVIDER_ERROR` (502), `ACCOUNT_NOT_AVAILABLE` (422), `INVALID_SIGNATURE` (401), `INVALID_SIGNED_REQUEST` (400).
+
+## Phase 10 endpoints
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/social/settings` | `social:read` | `{ requireApproval, canPublish, canDraft }` |
+| PATCH | `/social/settings` | `social:publish` + `organization:update` | `{ requireApproval }` |
+| GET | `/social/posts?status&platform&workspaceId&q&page&pageSize` | `social:read` | Paginated `SocialPostDto` (targets, per-account status and results, first-media preview URL) |
+| POST | `/social/posts/validate` | `social:draft` | Dry run: `{ caption, hashtags, media, targets }` → `{ ok, targets: [{ platform, socialAccountId, issues: [{ level, code, message }] }] }` |
+| POST | `/social/posts` | `social:draft` | `{ workspaceId, caption, hashtags[], media: [{ fileId, kind, mimeType, width, height, durationSec?, sizeBytes, altText? }], targets: [{ socialAccountId, captionOverride?, options?: { title, privacy, madeForKids } }], sourceDesignId?, copyAssetId? }` → draft |
+| GET / PATCH / DELETE | `/social/posts/:id` | read / `social:draft` | Edit until publishing starts (drafters only their own drafts). Delete removes the post from ZatGo only (already-published posts stay on the platforms) |
+| POST | `/social/posts/:id/duplicate` | `social:draft` | Copy into a new draft |
+| POST | `/social/posts/:id/submit` | `social:draft` | Draft → `PENDING_APPROVAL` (must pass validation) |
+| POST | `/social/posts/:id/approve` | `social:publish` | `{ note? }`; emails the author. `403 SELF_APPROVAL_NOT_ALLOWED` when approval is required |
+| POST | `/social/posts/:id/reject` | `social:publish` | `{ note }` (required); back to draft, emails the author |
+| POST | `/social/posts/:id/schedule` | `social:publish` | `{ scheduledAt (ISO with offset), timezone (IANA) }`; in the future, at most 6 months ahead. Re-scheduling replaces the job |
+| POST | `/social/posts/:id/publish` | `social:publish` | `{ confirm: true }` required. Publishes now through the queue |
+| POST | `/social/posts/:id/cancel` | `social:publish` | Scheduled → draft |
+| POST | `/social/posts/:id/targets/:targetId/retry` | `social:publish` | Retries one failed account |
+| GET | `/social/calendar?from&to&workspaceId&platform&status` | `social:read` | Up to 62 days: `[{ id, status, at, caption, thumbnailUrl, platforms, accounts }]` |
+
+Statuses:
+* Post: `DRAFT`, `PENDING_APPROVAL`, `SCHEDULED`, `PUBLISHING`, `PUBLISHED`, `PARTIALLY_PUBLISHED`, `FAILED`.
+* Per account: `PENDING`, `PUBLISHING`, `PUBLISHED`, `FAILED`.
+
+Error codes: `POST_INVALID` (422, with per-target issues), `NO_TARGETS`, `ACCOUNT_NOT_IN_WORKSPACE`, `MEDIA_NOT_FOUND`, `ACCOUNT_NEEDS_ATTENTION` (409), `APPROVAL_REQUIRED` (409), `POST_LOCKED` (409), `INVALID_STATUS` (409), `SCHEDULE_IN_PAST`, `SCHEDULE_TOO_FAR`, `PLAN_LIMIT_REACHED` (402, metric `postsPerMonth`).
+
+Uploads: `POST /storage/uploads` accepts `purpose: POST_MEDIA` for JPEG, PNG, WebP (up to 20 MB) and MP4 or MOV (up to 250 MB).

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import type { SocialPlatform } from '@zatma/validation';
-import { ProviderAuthError, requestJson, type DiscoveredAccount, type FetchLike, type HealthResult, type OAuthGrant, type SocialProvider } from './provider.js';
+import { form, ProviderAuthError, ProviderError, requestJson, type DiscoveredAccount, type FetchLike, type HealthResult, type OAuthGrant, type PublishRequest, type PublishResult, type SocialProvider } from './provider.js';
 
 export interface MetaConfig {
   appId: string;
@@ -130,6 +130,107 @@ export class MetaProvider implements SocialProvider {
 
   async revoke(accessToken: string): Promise<void> {
     await requestJson(this.fetchImpl, this.graph('me/permissions', {}, accessToken), { method: 'DELETE', authErrors: isMetaAuthError });
+  }
+
+  // ───────────── Publishing (Phase 10) ─────────────
+
+  private post<T>(path: string, token: string, body: Record<string, string | undefined>): Promise<T> {
+    return requestJson<T>(this.fetchImpl, this.graph(path, {}, token), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form(body),
+      authErrors: isMetaAuthError,
+    });
+  }
+
+  private get<T>(path: string, token: string, fields: string): Promise<T> {
+    return requestJson<T>(this.fetchImpl, this.graph(path, { fields }, token), { authErrors: isMetaAuthError });
+  }
+
+  async publish(req: PublishRequest): Promise<PublishResult> {
+    return req.platform === 'INSTAGRAM_BUSINESS' ? this.publishInstagram(req) : this.publishFacebook(req);
+  }
+
+  /** Page feed post, photo, multi-photo (unpublished photos attached to a feed post) or video. */
+  private async publishFacebook(req: PublishRequest): Promise<PublishResult> {
+    const { token, externalId: pageId, media, text } = req;
+    let postId = req.state.postId as string | undefined;
+    if (!postId) {
+      const images = media.filter((m) => m.kind === 'image');
+      const video = media.find((m) => m.kind === 'video');
+      if (video) {
+        const r = await this.post<{ id: string }>(`${pageId}/videos`, token, { file_url: await video.signedUrl(), description: text || undefined });
+        postId = r.id;
+      } else if (images.length === 1) {
+        const r = await this.post<{ id: string; post_id?: string }>(`${pageId}/photos`, token, { url: await images[0]!.signedUrl(), caption: text || undefined, alt_text_custom: images[0]!.altText });
+        postId = r.post_id ?? r.id;
+      } else if (images.length > 1) {
+        const photoIds = [...((req.state.photoIds as string[] | undefined) ?? [])];
+        for (let i = photoIds.length; i < images.length; i++) {
+          const r = await this.post<{ id: string }>(`${pageId}/photos`, token, { url: await images[i]!.signedUrl(), published: 'false', alt_text_custom: images[i]!.altText });
+          photoIds.push(r.id);
+          await req.saveState({ photoIds });
+        }
+        const r = await this.post<{ id: string }>(`${pageId}/feed`, token, { message: text || undefined, attached_media: JSON.stringify(photoIds.map((id) => ({ media_fbid: id }))) });
+        postId = r.id;
+      } else {
+        const r = await this.post<{ id: string }>(`${pageId}/feed`, token, { message: text });
+        postId = r.id;
+      }
+      await req.saveState({ postId });
+    }
+    return { status: 'published', externalId: postId, url: await this.permalink(postId, token, 'permalink_url') };
+  }
+
+  /** Content Publishing API: create container(s), wait until FINISHED, then media_publish. */
+  private async publishInstagram(req: PublishRequest): Promise<PublishResult> {
+    const { token, externalId: igId, media, text } = req;
+    let mediaId = req.state.mediaId as string | undefined;
+    if (!mediaId) {
+      let containerId = req.state.containerId as string | undefined;
+      if (!containerId) {
+        const video = media.find((m) => m.kind === 'video');
+        const images = media.filter((m) => m.kind === 'image');
+        if (video) {
+          containerId = (await this.post<{ id: string }>(`${igId}/media`, token, { media_type: 'REELS', video_url: await video.signedUrl(), caption: text || undefined, share_to_feed: 'true' })).id;
+        } else if (images.length === 1) {
+          containerId = (await this.post<{ id: string }>(`${igId}/media`, token, { image_url: await images[0]!.signedUrl(), caption: text || undefined, alt_text: images[0]!.altText })).id;
+        } else if (images.length > 1) {
+          const children = [...((req.state.children as string[] | undefined) ?? [])];
+          for (let i = children.length; i < images.length; i++) {
+            children.push((await this.post<{ id: string }>(`${igId}/media`, token, { image_url: await images[i]!.signedUrl(), is_carousel_item: 'true', alt_text: images[i]!.altText })).id);
+            await req.saveState({ children });
+          }
+          containerId = (await this.post<{ id: string }>(`${igId}/media`, token, { media_type: 'CAROUSEL', children: children.join(','), caption: text || undefined })).id;
+        } else {
+          throw new ProviderError('Instagram posts need an image or a video', 422);
+        }
+        await req.saveState({ containerId });
+      }
+      const status = await this.get<{ status_code?: string; status?: string }>(containerId, token, 'status_code,status');
+      if (status.status_code === 'IN_PROGRESS') return { status: 'processing', retryAfterMs: 10_000 };
+      if (status.status_code === 'EXPIRED') {
+        // Containers expire after 24 h: start over on the next attempt.
+        await req.saveState({ containerId: null, children: null });
+        throw new ProviderError('The Instagram upload expired before publishing', 503);
+      }
+      if (status.status_code === 'ERROR') throw new ProviderError(`Instagram could not process the media${status.status ? `: ${status.status}` : ''}`, 422);
+      mediaId = (await this.post<{ id: string }>(`${igId}/media_publish`, token, { creation_id: containerId })).id;
+      await req.saveState({ mediaId });
+    }
+    return { status: 'published', externalId: mediaId, url: await this.permalink(mediaId, token, 'permalink') };
+  }
+
+  /** Best-effort permalink (the post exists even if this lookup fails). */
+  private async permalink(id: string, token: string, field: 'permalink_url' | 'permalink'): Promise<string | null> {
+    try {
+      const r = await this.get<Record<string, string | undefined>>(id, token, field);
+      const link = r[field];
+      if (!link) return null;
+      return link.startsWith('/') ? `https://www.facebook.com${link}` : link;
+    } catch {
+      return null;
+    }
   }
 }
 

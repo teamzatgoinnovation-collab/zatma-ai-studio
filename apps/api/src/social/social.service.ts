@@ -289,6 +289,27 @@ export class SocialService {
     return (await this.listRows()).map((r) => this.toDto(r));
   }
 
+  /**
+   * What the publisher needs for one account: the adapter, the account's platform identity and a usable token
+   * (the Meta Page token, or the grant's access token refreshed when about to expire).
+   */
+  async publishingTarget(accountId: string): Promise<{ provider: SocialProvider; platform: SocialPlatform; externalId: string; capabilities: Record<string, unknown>; name: string; token: string }> {
+    const a = await this.accountRow(accountId);
+    const { provider, cipher } = this.require(a.connection.provider as SocialProviderId);
+    if (!provider.publish) throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, 'PUBLISHING_NOT_SUPPORTED', `${provider.name} publishing is not available`);
+    if (a.status === 'NEEDS_REAUTH' || a.connection.status !== 'ACTIVE') {
+      throw new AppException(HttpStatus.CONFLICT, 'SOCIAL_REAUTH_REQUIRED', `${a.name} must be reconnected`, { accountId });
+    }
+    const token = a.accountTokenEncrypted ? cipher.decrypt(a.accountTokenEncrypted, this.acctAad(a)) : await this.accessToken(a.connection);
+    return { provider, platform: a.platform as SocialPlatform, externalId: a.externalId, capabilities: (a.capabilities ?? {}) as Record<string, unknown>, name: a.name, token };
+  }
+
+  /** Called by the publisher when a platform rejects the token: same path as a failed health check (audit + email). */
+  async markNeedsReauth(accountId: string, error: string): Promise<void> {
+    const a = await this.accountRow(accountId).catch(() => null);
+    if (a) await this.recordHealth(a, { status: 'NEEDS_REAUTH', error });
+  }
+
   private async accountRow(id: string): Promise<AccountRow> {
     const [row] = await this.listRows({ id });
     if (!row) throw notFound('Social account');

@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import type { PlanLimits, UsageMetric, UsageSummary } from '@zatma/types';
+import { monthWindow } from '@zatma/validation';
 import { AppException } from '../common/errors.js';
 import type { Plan, Subscription } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -33,7 +34,9 @@ export class UsageService {
     const db = this.prisma.system;
     const { subscription } = await this.effectivePlan(organizationId);
     const periodStart = subscription?.currentPeriodStart ?? new Date(Date.now() - 30 * 24 * 3600 * 1000);
-    const [members, pendingInvitations, workspaces, storage, credits, leads, contacts, socialAccounts] = await Promise.all([
+    const month = monthWindow(new Date());
+    const inMonth = { gte: month.start, lt: month.end };
+    const [members, pendingInvitations, workspaces, storage, credits, leads, contacts, socialAccounts, posts] = await Promise.all([
       db.member.count({ where: { organizationId } }),
       db.invitation.count({ where: { organizationId, status: 'pending', expiresAt: { gt: new Date() } } }),
       db.workspace.count({ where: { organizationId } }),
@@ -42,6 +45,16 @@ export class UsageService {
       db.lead.count({ where: { organizationId, deletedAt: null } }),
       db.contact.count({ where: { organizationId, deletedAt: null } }),
       db.socialAccount.count({ where: { organizationId, status: { not: 'DISCONNECTED' } } }),
+      // One "post" per account: published this month, or scheduled/publishing for this month.
+      db.socialPostTarget.count({
+        where: {
+          organizationId,
+          OR: [
+            { status: 'PUBLISHED', publishedAt: inMonth },
+            { status: { in: ['PENDING', 'PUBLISHING'] }, post: { status: { in: ['SCHEDULED', 'PUBLISHING'] }, deletedAt: null, scheduledAt: inMonth } },
+          ],
+        },
+      }),
     ]);
     return {
       members: members + pendingInvitations,
@@ -50,6 +63,7 @@ export class UsageService {
       aiCredits: credits._sum.credits ?? 0,
       socialAccounts,
       crmRecords: leads + contacts,
+      postsPerMonth: posts,
     };
   }
 
@@ -76,7 +90,7 @@ export class UsageService {
   /** Metrics where current usage exceeds `limits` (used to block downgrades). */
   exceeded(used: Record<UsageMetric, number>, limits: PlanLimits): Array<{ metric: UsageMetric; used: number; limit: number }> {
     return (Object.keys(used) as UsageMetric[])
-      .filter((m) => m !== 'aiCredits')
+      .filter((m) => m !== 'aiCredits' && m !== 'postsPerMonth')
       .map((metric) => ({ metric, used: used[metric], limit: limits[metric] }))
       .filter((x) => x.limit !== UNLIMITED && x.used > x.limit);
   }
@@ -89,4 +103,5 @@ export const METRIC_LABELS: Record<UsageMetric, string> = {
   aiCredits: 'AI credits',
   socialAccounts: 'social accounts',
   crmRecords: 'CRM contacts and leads',
+  postsPerMonth: 'social posts per month',
 };

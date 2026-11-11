@@ -42,7 +42,7 @@ export class SocialProviderRegistry implements OnModuleInit {
     }
     if (e.YOUTUBE_CLIENT_ID && e.YOUTUBE_CLIENT_SECRET) {
       this.register(
-        new YouTubeProvider({ clientId: e.YOUTUBE_CLIENT_ID, clientSecret: e.YOUTUBE_CLIENT_SECRET, authUrl: e.GOOGLE_OAUTH_URL, tokenUrl: e.GOOGLE_TOKEN_URL, revokeUrl: e.GOOGLE_REVOKE_URL, apiUrl: e.YOUTUBE_API_URL }),
+        new YouTubeProvider({ clientId: e.YOUTUBE_CLIENT_ID, clientSecret: e.YOUTUBE_CLIENT_SECRET, authUrl: e.GOOGLE_OAUTH_URL, tokenUrl: e.GOOGLE_TOKEN_URL, revokeUrl: e.GOOGLE_REVOKE_URL, apiUrl: e.YOUTUBE_API_URL, uploadUrl: e.YOUTUBE_UPLOAD_URL }),
       );
     }
     this.logger.log(`Social platforms: ${[...this.providers.keys()].join(', ') || 'none configured'}`);

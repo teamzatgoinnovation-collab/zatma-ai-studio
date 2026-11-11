@@ -7,11 +7,13 @@ import { AccountSettings } from './account-settings';
 import { AISettings } from './ai-settings';
 import { OrganizationSettings } from './organization-settings';
 import { ScoringSettingsPanel } from '@/components/crm/scoring';
+import { PublishingSettingsPanel } from '@/components/publishing/settings-panel';
 
 const TABS = [
   { id: 'organization', label: 'Organization' },
   { id: 'ai', label: 'AI' },
   { id: 'crm', label: 'CRM scoring' },
+  { id: 'publishing', label: 'Publishing' },
   { id: 'account', label: 'Your account' },
 ];
 
@@ -24,10 +26,10 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader icon={<Settings />} title="Settings" description="Manage your organization profile, AI providers, CRM scoring and your personal account." />
+      <PageHeader icon={<Settings />} title="Settings" description="Manage your organization profile, AI providers, CRM scoring, publishing approvals and your personal account." />
       <Tabs label="Settings sections" withPanels items={TABS} value={tab} onChange={(id) => router.replace(`${pathname}?tab=${id}`)} />
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-        {tab === 'organization' ? <OrganizationSettings /> : tab === 'ai' ? <AISettings /> : tab === 'crm' ? <ScoringSettingsPanel /> : <AccountSettings />}
+        {tab === 'organization' ? <OrganizationSettings /> : tab === 'ai' ? <AISettings /> : tab === 'crm' ? <ScoringSettingsPanel /> : tab === 'publishing' ? <PublishingSettingsPanel /> : <AccountSettings />}
       </div>
     </div>
   );

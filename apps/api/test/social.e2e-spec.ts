@@ -140,7 +140,7 @@ describe('Social accounts (e2e)', () => {
     expect(JSON.stringify(listed.body)).not.toMatch(/access-|page-token|v1\.k1\./);
     expect((await api(app, owner).get(`/social/connections/${connectionId}/available`).expect(200)).body[0].alreadyAdded).toBe(true);
 
-    const pageRow = await app.get(PrismaService).system.socialAccount.findFirstOrThrow({ where: { externalId: 'p1' } });
+    const pageRow = await app.get(PrismaService).system.socialAccount.findFirstOrThrow({ where: { organizationId: orgId, externalId: 'p1' } });
     expect(new TokenCipher(KEY).decrypt(pageRow.accountTokenEncrypted!, `${orgId}:acct:FACEBOOK_PAGE:p1`)).toBe('page-token-p1');
 
     await api(app, owner).post('/social/accounts', { connectionId, externalIds: ['nope'] }).expect(422);

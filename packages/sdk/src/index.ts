@@ -26,10 +26,19 @@ import type {
 import type {
   AddSocialAccountsInput,
   AvailableSocialAccount,
+  CalendarEntry,
   ConnectSocialInput,
+  CreatePostRequest,
+  PostMedia,
+  PostTargetInput,
+  PublishingSettingsDto,
   SocialAccountDto,
+  SocialPostDto,
   SocialProviderId,
   SocialProviderInfo,
+  SocialSettings,
+  TargetValidation,
+  UpdatePostRequest,
 } from '@zatma/validation';
 import type {
   DraftMessageInput,
@@ -302,6 +311,26 @@ export function createApiClient(options: ApiClientOptions) {
       update: (accountId: string, input: { workspaceIds: string[] }) => request<SocialAccountDto>('PATCH', `/social/accounts/${id(accountId)}`, input),
       check: (accountId: string) => request<SocialAccountDto>('POST', `/social/accounts/${id(accountId)}/check`),
       remove: (accountId: string) => request<void>('DELETE', `/social/accounts/${id(accountId)}`),
+      settings: () => request<PublishingSettingsDto>('GET', '/social/settings'),
+      updateSettings: (input: SocialSettings) => request<PublishingSettingsDto>('PATCH', '/social/settings', input),
+      calendar: (query: { from: string; to: string; workspaceId?: string; platform?: string; status?: string }) => request<CalendarEntry[]>('GET', '/social/calendar', undefined, query),
+      posts: {
+        list: (query?: { status?: string; platform?: string; workspaceId?: string; q?: string; page?: number; pageSize?: number }) => request<Paginated<SocialPostDto>>('GET', '/social/posts', undefined, query),
+        get: (postId: string) => request<SocialPostDto>('GET', `/social/posts/${id(postId)}`),
+        create: (input: CreatePostRequest) => request<SocialPostDto>('POST', '/social/posts', input),
+        update: (postId: string, input: UpdatePostRequest) => request<SocialPostDto>('PATCH', `/social/posts/${id(postId)}`, input),
+        remove: (postId: string) => request<void>('DELETE', `/social/posts/${id(postId)}`),
+        validate: (input: { caption: string; hashtags: string[]; media: PostMedia[]; targets: PostTargetInput[] }) => request<{ ok: boolean; targets: TargetValidation[] }>('POST', '/social/posts/validate', input),
+        duplicate: (postId: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/duplicate`),
+        submit: (postId: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/submit`),
+        approve: (postId: string, note?: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/approve`, note ? { note } : {}),
+        reject: (postId: string, note: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/reject`, { note }),
+        schedule: (postId: string, input: { scheduledAt: string; timezone: string }) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/schedule`, input),
+        /** Posts to every selected account immediately. Only call after the user confirmed. */
+        publishNow: (postId: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/publish`, { confirm: true }),
+        cancel: (postId: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/cancel`),
+        retry: (postId: string, targetId: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/targets/${id(targetId)}/retry`),
+      },
     },
     copyAssets: {
       list: (query?: { page?: number; pageSize?: number; q?: string; kind?: string; language?: string; favorite?: 'true' | 'false' }) =>
