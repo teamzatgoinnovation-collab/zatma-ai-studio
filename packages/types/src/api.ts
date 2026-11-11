@@ -57,6 +57,8 @@ export interface PlanLimits {
   workspaces: number;
   /** Contacts + leads stored in the CRM. */
   crmRecords: number;
+  /** Social posts published or scheduled per account per UTC calendar month (Phase 10). */
+  postsPerMonth: number;
 }
 
 export interface PlanSummary {

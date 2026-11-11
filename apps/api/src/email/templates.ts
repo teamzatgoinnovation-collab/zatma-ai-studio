@@ -59,6 +59,42 @@ export const emailTemplates = {
     };
   },
 
+  postReviewed(input: { name: string; approved: boolean; reviewer: string; note: string | null; preview: string; url: string }): Template {
+    return {
+      tag: input.approved ? 'post-approved' : 'post-rejected',
+      subject: input.approved ? 'Your post was approved' : 'Changes requested on your post',
+      ...layout({
+        preheader: input.approved ? `${input.reviewer} approved your post.` : `${input.reviewer} asked for changes to your post.`,
+        heading: input.approved ? 'Post approved' : 'Changes requested',
+        paragraphs: [
+          `Hi ${input.name}, ${input.reviewer} ${input.approved ? 'approved' : 'asked for changes to'} your post: “${input.preview}”.`,
+          ...(input.note ? [`Note: ${input.note}`] : []),
+          input.approved ? 'It can now be scheduled or published.' : 'Edit the post and submit it again when it is ready.',
+        ],
+        action: { label: 'Open post', url: input.url },
+        footnote: 'You are receiving this because you submitted this post for approval.',
+      }),
+    };
+  },
+
+  postFailed(input: { name: string; accountName: string; platformLabel: string; error: string; preview: string; url: string }): Template {
+    return {
+      tag: 'post-failed',
+      subject: `A post to ${input.accountName} (${input.platformLabel}) failed`,
+      ...layout({
+        preheader: `${input.platformLabel} did not accept the post.`,
+        heading: 'Post not published',
+        paragraphs: [
+          `Hi ${input.name}, your post “${input.preview}” could not be published to ${input.accountName} (${input.platformLabel}).`,
+          `Reason reported: ${input.error}`,
+          'Nothing was posted to this account. You can fix the problem and retry from the post.',
+        ],
+        action: { label: 'Open post', url: input.url },
+        footnote: 'You are receiving this because you created or scheduled this post.',
+      }),
+    };
+  },
+
   verifyEmail(input: { name: string; url: string }): Template {
     return {
       tag: 'verify-email',

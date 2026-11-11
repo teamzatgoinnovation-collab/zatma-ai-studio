@@ -117,7 +117,7 @@ describe('LinkedInProvider', () => {
   });
 });
 
-const YT = { clientId: 'g1', clientSecret: 'gs', authUrl: 'https://accounts.g.test/o/oauth2/v2/auth', tokenUrl: 'https://oauth2.g.test/token', revokeUrl: 'https://oauth2.g.test/revoke', apiUrl: 'https://yt.g.test/youtube/v3' };
+const YT = { clientId: 'g1', clientSecret: 'gs', authUrl: 'https://accounts.g.test/o/oauth2/v2/auth', tokenUrl: 'https://oauth2.g.test/token', revokeUrl: 'https://oauth2.g.test/revoke', apiUrl: 'https://yt.g.test/youtube/v3', uploadUrl: 'https://upload.yt.test/youtube/v3' };
 
 describe('YouTubeProvider', () => {
   it('uses offline access with PKCE and lists channels', async () => {

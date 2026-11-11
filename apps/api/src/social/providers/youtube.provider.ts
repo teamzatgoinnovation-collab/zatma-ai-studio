@@ -1,5 +1,19 @@
 import type { SocialPlatform } from '@zatma/validation';
-import { expiresIn, form, ProviderAuthError, requestJson, type DiscoveredAccount, type FetchLike, type HealthResult, type OAuthGrant, type SocialProvider } from './provider.js';
+import {
+  expiresIn,
+  form,
+  ProviderAuthError,
+  ProviderError,
+  requestJson,
+  requestRaw,
+  type DiscoveredAccount,
+  type FetchLike,
+  type HealthResult,
+  type OAuthGrant,
+  type PublishRequest,
+  type PublishResult,
+  type SocialProvider,
+} from './provider.js';
 
 export interface YouTubeConfig {
   clientId: string;
@@ -8,6 +22,8 @@ export interface YouTubeConfig {
   tokenUrl: string;
   revokeUrl: string;
   apiUrl: string;
+  /** Resumable upload endpoint (https://www.googleapis.com/upload/youtube/v3). */
+  uploadUrl: string;
 }
 
 export const YOUTUBE_SCOPES = ['https://www.googleapis.com/auth/youtube.readonly', 'https://www.googleapis.com/auth/youtube.upload'];
@@ -112,7 +128,75 @@ export class YouTubeProvider implements SocialProvider {
     }
   }
 
+  // ───────────── Publishing (Phase 10): resumable upload ─────────────
+
+  async publish(req: PublishRequest): Promise<PublishResult> {
+    let videoId = req.state.videoId as string | undefined;
+    if (!videoId) {
+      const video = req.media.find((m) => m.kind === 'video');
+      if (!video) throw new ProviderError('YouTube needs a video', 422);
+      const auth = { Authorization: `Bearer ${req.token}` };
+      let session = req.state.uploadUrl as string | undefined;
+      let offset = 0;
+      if (session) {
+        // Ask where the interrupted upload stopped.
+        const probe = await requestRaw(this.fetchImpl, session, {
+          method: 'PUT',
+          headers: { ...auth, 'Content-Range': `bytes */${video.sizeBytes}`, 'Content-Length': '0' },
+          okStatuses: [308, 404, 410],
+          authErrors: (s) => s === 401,
+        });
+        if (probe.status === 404 || probe.status === 410) {
+          session = undefined;
+          await req.saveState({ uploadUrl: null });
+        } else if (probe.status === 308) {
+          offset = nextOffset(probe.headers.get('range'));
+        } else {
+          videoId = (probe.body as { id: string }).id;
+        }
+      }
+      if (!videoId && !session) {
+        const tags = req.hashtags.map((t) => t.replace(/^#/, '')).filter(Boolean).slice(0, 30);
+        const init = await requestRaw(this.fetchImpl, `${this.cfg.uploadUrl.replace(/\/$/, '')}/videos?uploadType=resumable&part=snippet,status`, {
+          method: 'POST',
+          headers: { ...auth, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': video.mimeType, 'X-Upload-Content-Length': String(video.sizeBytes) },
+          body: JSON.stringify({
+            snippet: { title: req.options.title ?? 'Untitled', description: req.text, tags, categoryId: '22' },
+            status: { privacyStatus: req.options.privacy ?? 'private', selfDeclaredMadeForKids: req.options.madeForKids ?? false, embeddable: true },
+          }),
+          authErrors: (s, b) => s === 401 || (s === 403 && JSON.stringify(b).includes('insufficientPermissions')),
+        });
+        session = init.headers.get('location') ?? undefined;
+        if (!session) throw new ProviderError('YouTube did not return an upload session', 502);
+        await req.saveState({ uploadUrl: session });
+      }
+      while (!videoId) {
+        const end = Math.min(offset + UPLOAD_CHUNK_BYTES, video.sizeBytes) - 1;
+        const res = await requestRaw(this.fetchImpl, session!, {
+          method: 'PUT',
+          headers: { ...auth, 'Content-Type': video.mimeType, 'Content-Range': `bytes ${offset}-${end}/${video.sizeBytes}` },
+          body: new Uint8Array(await video.read(offset, end)),
+          okStatuses: [308],
+          authErrors: (s) => s === 401,
+        });
+        if (res.status === 308) offset = nextOffset(res.headers.get('range'));
+        else videoId = (res.body as { id: string }).id;
+      }
+      await req.saveState({ videoId, uploadUrl: null });
+    }
+    return { status: 'published', externalId: videoId, url: `https://www.youtube.com/watch?v=${videoId}` };
+  }
+
   async revoke(accessToken: string): Promise<void> {
     await requestJson(this.fetchImpl, `${this.cfg.revokeUrl}?token=${encodeURIComponent(accessToken)}`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
   }
+}
+
+/** 8 MiB: chunks must be multiples of 256 KiB (except the last). */
+export const UPLOAD_CHUNK_BYTES = 32 * 256 * 1024;
+
+/** Next byte to send from a resumable-upload `Range: bytes=0-N` header (none means nothing stored yet). */
+function nextOffset(range: string | null): number {
+  const m = range?.match(/bytes=0-(\d+)/);
+  return m ? Number(m[1]) + 1 : 0;
 }

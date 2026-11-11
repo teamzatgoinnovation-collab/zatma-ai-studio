@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { withoutDefaults } from './patch.js';
 
 // ───────────── Enums ─────────────
 
@@ -264,7 +265,7 @@ export const createLeadSchema = z
   })
   .strict();
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
-export const updateLeadSchema = createLeadSchema.omit({ allowDuplicate: true }).partial().strict();
+export const updateLeadSchema = withoutDefaults(createLeadSchema.omit({ allowDuplicate: true }).partial()).strict();
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 
 const listBase = {
@@ -309,7 +310,7 @@ export const createContactSchema = z
   .object({ ...personFields, companyId: uuid.nullable().optional(), lifecycle: z.enum(LIFECYCLES).default('PROSPECT'), source: z.enum(LEAD_SOURCES).default('other'), notes: opt(4000), allowDuplicate: z.boolean().default(false) })
   .strict();
 export type CreateContactInput = z.infer<typeof createContactSchema>;
-export const updateContactSchema = createContactSchema.omit({ allowDuplicate: true }).partial().strict();
+export const updateContactSchema = withoutDefaults(createContactSchema.omit({ allowDuplicate: true }).partial()).strict();
 export type UpdateContactInput = z.infer<typeof updateContactSchema>;
 export const listContactsSchema = z.object({ ...listBase, lifecycle: z.enum(LIFECYCLES).optional(), companyId: uuid.optional() });
 export type ListContactsInput = z.infer<typeof listContactsSchema>;
@@ -331,7 +332,7 @@ export const createCompanySchema = z
   })
   .strict();
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
-export const updateCompanySchema = createCompanySchema.partial().strict();
+export const updateCompanySchema = withoutDefaults(createCompanySchema.partial()).strict();
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
 export const listCompaniesSchema = z.object({ ...listBase, industry: z.string().trim().max(80).optional() });
 export type ListCompaniesInput = z.infer<typeof listCompaniesSchema>;
@@ -351,7 +352,7 @@ export const createPipelineSchema = z
 export type CreatePipelineInput = z.infer<typeof createPipelineSchema>;
 export const updatePipelineSchema = z.object({ name: z.string().trim().min(1).max(80).optional(), isDefault: z.literal(true).optional() }).strict();
 export const createStageSchema = z.object({ name: z.string().trim().min(1).max(60), probability: z.number().int().min(0).max(100), kind: z.enum(STAGE_KINDS).default('OPEN') }).strict();
-export const updateStageSchema = createStageSchema.partial().strict();
+export const updateStageSchema = withoutDefaults(createStageSchema.partial()).strict();
 export const reorderStagesSchema = z.object({ stageIds: z.array(uuid).min(1).max(20) }).strict();
 export const deleteStageSchema = z.object({ moveDealsTo: uuid.optional() }).strict();
 
@@ -373,7 +374,7 @@ export const createDealSchema = z
   })
   .strict();
 export type CreateDealInput = z.infer<typeof createDealSchema>;
-export const updateDealSchema = createDealSchema.omit({ pipelineId: true, stageId: true }).partial().strict();
+export const updateDealSchema = withoutDefaults(createDealSchema.omit({ pipelineId: true, stageId: true }).partial()).strict();
 export type UpdateDealInput = z.infer<typeof updateDealSchema>;
 export const listDealsSchema = z.object({ ...listBase, status: z.enum(DEAL_STATUSES).optional(), pipelineId: uuid.optional(), stageId: uuid.optional(), contactId: uuid.optional(), companyId: uuid.optional() });
 export type ListDealsInput = z.infer<typeof listDealsSchema>;

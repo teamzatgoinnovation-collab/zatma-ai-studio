@@ -14,14 +14,14 @@ presented as connected.
 | **Google Gemini** | Text (`gemini-3.8-flash`) + image (`gemini-3.1-flash-image`) generation | 4 | `GEMINI_API_KEY` (optional `GEMINI_TEXT_MODEL`, `GEMINI_IMAGE_MODEL`) | **Implemented**; enabled when the key is set |
 | **Video provider(s)** | Text/image to video | 16 | Vendor key (TBD) | Pending |
 | **S3-compatible storage** | Assets, exports | 1 | `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET` (moto S3 emulator in dev, Cloudflare R2 in prod; bucket CORS must allow PUT from the web origin) | Implemented (presigned upload, completion check, signed downloads) |
-| **Meta Graph API: Pages** | Facebook Page connection (P9), publishing and insights (P10) | 9–10 | Meta App (`META_APP_ID/SECRET`), Business verification, App Review: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_manage_metadata`, `business_management` | **Connection implemented** (OAuth, long-lived tokens, Page discovery, health checks, webhooks, deauthorize and data deletion). Enabled when keys are set; real accounts need App Review. Publishing is Phase 10 |
-| **Meta Graph API: Instagram** | IG Business/Creator connection (P9) and publishing (P10) | 9–10 | `instagram_basic`, `instagram_content_publish`, IG account linked to a Page | **Connection implemented** (discovered through the linked Page). Publishing is Phase 10 |
+| **Meta Graph API: Pages** | Facebook Page connection (P9), publishing and insights (P10) | 9–10 | Meta App (`META_APP_ID/SECRET`), Business verification, App Review: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_manage_metadata`, `business_management` | **Connection implemented** (OAuth, long-lived tokens, Page discovery, health checks, webhooks, deauthorize and data deletion). Enabled when keys are set; real accounts need App Review. **Publishing implemented (P10)**: feed text, photo, multi-photo, video |
+| **Meta Graph API: Instagram** | IG Business/Creator connection (P9) and publishing (P10) | 9–10 | `instagram_basic`, `instagram_content_publish`, IG account linked to a Page | **Connection and publishing implemented** (single image, carousel, Reels via the Content Publishing API) |
 | **Meta Marketing API** | Ad accounts, campaigns, insights | 11 | `ads_management`, `ads_read`, `business_management`, Advanced Access | Pending |
 | **Meta Lead Ads** | Lead capture into CRM | 13 | `leads_retrieval`, webhook subscription (`leadgen`) | Pending |
 | **WhatsApp Business Platform (Cloud API)** | Messaging, templates | 14 | WABA, verified phone number, permanent system-user token, template approvals | Pending |
-| **LinkedIn** | Company Page connection (P9), posts (P10), ads (P11) | 9–11 | LinkedIn app (`LINKEDIN_CLIENT_ID/SECRET`) with **Community Management API** access | **Connection implemented** (OAuth, refresh, administered Pages, health, revoke). Enabled when keys are set |
+| **LinkedIn** | Company Page connection (P9), posts (P10), ads (P11) | 9–11 | LinkedIn app (`LINKEDIN_CLIENT_ID/SECRET`) with **Community Management API** access | **Connection and publishing implemented** (Posts API with text, images, multi-image and video) |
 | **TikTok** | Video posting, ads | 10–11 | Content Posting API audit, TikTok for Business API | Pending |
-| **YouTube Data API** | Channel connection (P9), video uploads (P10) | 9–10 | Separate Google OAuth client (`YOUTUBE_CLIENT_ID/SECRET`) with `youtube.readonly` + `youtube.upload`, consent-screen verification, quota | **Connection implemented** (OAuth + PKCE, offline refresh, channels, health, revoke). Enabled when keys are set |
+| **YouTube Data API** | Channel connection (P9), video uploads (P10) | 9–10 | Separate Google OAuth client (`YOUTUBE_CLIENT_ID/SECRET`) with `youtube.readonly` + `youtube.upload`, consent-screen verification, quota | **Connection and upload implemented** (resumable upload of one video per post) |
 | **Google Ads API** | Search/display/video campaigns, leads | 11 | Developer token (Basic access), OAuth, MCC | Pending |
 | **Pinterest API** | Pins | 10 | Pinterest app, standard access | Pending |
 | **Resend** | Transactional email (verification, reset, invitations, billing) | 2 | `RESEND_API_KEY`, `EMAIL_FROM`, verified sending domain (SPF/DKIM/DMARC on zatgoinnovation.com) | **Implemented**; dev uses the capture inbox (`/api/v1/dev/emails`) |
@@ -106,3 +106,31 @@ The page's provider cards (and `GET /api/v1/social/providers`) also show the exa
 All base URLs can be overridden (`META_GRAPH_URL`, `META_OAUTH_URL`, `LINKEDIN_API_URL`, `LINKEDIN_OAUTH_URL`, `GOOGLE_OAUTH_URL`,
 `GOOGLE_TOKEN_URL`, `GOOGLE_REVOKE_URL`, `YOUTUBE_API_URL`). Phase 9 was verified end to end against a local stand-in that serves the same
 endpoints and checks client secrets, redirect URIs, `appsecret_proof` and PKCE. Never set these overrides in production.
+
+## Social publishing (Phase 10)
+
+Posts are published only after a person confirms. **Publish now** sends `{ confirm: true }` after a confirmation dialog; a scheduled post goes out at the time someone chose.
+A post is never shown as published until the platform returns a post id.
+
+| Platform | Endpoints used (official) | Media rules enforced before sending |
+|---|---|---|
+| Facebook Page | `POST /{page}/feed` (text, or `attached_media` for several photos), `POST /{page}/photos` (`url`, `published=false` for multi-photo), `POST /{page}/videos` (`file_url`); `GET /{id}?fields=permalink_url` | Up to 10 images or 1 video; 63,206 characters |
+| Instagram Business | `POST /{ig}/media` (`image_url`; `media_type=REELS` + `video_url`; `is_carousel_item` children + `media_type=CAROUSEL`), `GET /{container}?fields=status_code`, `POST /{ig}/media_publish` | Media required; 1 image, a carousel of 2–10, or one Reel of 3 s–15 min; JPEG; aspect ratio 4:5–1.91:1; 2,200 characters; 30 hashtags |
+| LinkedIn Page | `POST /rest/images?action=initializeUpload` + `PUT`; `POST /rest/videos?action=initializeUpload` + multipart `PUT`s (ETags) + `finalizeUpload` + `GET /rest/videos/{urn}`; `POST /rest/posts` (id in `x-restli-id`) | Up to 20 images or 1 MP4 video (3 s–30 min); 3,000 characters; commentary escaped as "little text", with hashtags as `{hashtag|\\#|tag}` |
+| YouTube | `POST {YOUTUBE_UPLOAD_URL}/videos?uploadType=resumable&part=snippet,status`, then chunked `PUT`s (8 MiB) with `Content-Range`; resumes with `bytes */size` | Exactly one video; title 1–100 characters without `<` or `>`; privacy and made-for-kids required; description 5,000 characters |
+
+**Media delivery:**
+* Meta fetches media itself from a signed storage URL valid for 1 hour. The bucket must be reachable from the internet: Cloudflare R2 or S3, not a private network.
+* LinkedIn and YouTube receive bytes the API streams from storage in ranges, so large videos never sit in memory.
+
+**Retries:**
+* Network errors, HTTP 429 and 5xx responses, and Meta transient codes (1, 2, 4, 17, 32, 341, 613) are retried up to 5 times, waiting 30 s, 2 min, 8 min and 32 min.
+* Each step's progress (photo ids, container ids, upload URNs and ETags, the YouTube session) is saved, so a retry never repeats a finished step and never posts twice.
+* Token errors mark the account *Reconnect needed* and email the person who connected it.
+
+**Quotas and review:**
+* YouTube uploads cost about 1,600 quota units each, so the default 10,000 units/day allows about 6 uploads. Request more quota before launch.
+* Instagram allows 100 API-published posts per 24 hours per account.
+* Meta App Review must cover `pages_manage_posts` and `instagram_content_publish`; LinkedIn needs `w_organization_social`.
+
+**Verification without keys:** the stand-in server used in Phase 9 also implements these endpoints and checks `appsecret_proof`, upload sizes, ETags, `LinkedIn-Version` headers and resumable `Content-Range` handling.

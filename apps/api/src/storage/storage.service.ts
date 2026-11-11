@@ -15,6 +15,7 @@ const EXTENSIONS: Record<string, string> = {
   'image/webp': 'webp',
   'image/svg+xml': 'svg',
   'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
   'application/pdf': 'pdf',
   'text/csv': 'csv',
 };
@@ -118,6 +119,16 @@ export class StorageService {
       },
     });
     return { id: file.id, key };
+  }
+
+  /** Short-lived signed GET for a platform to fetch post media (never logged or returned to clients). */
+  presignForPlatform(key: string, expiresInSeconds = 3600): Promise<string> {
+    return this.storage.presignGet(key, expiresInSeconds);
+  }
+
+  /** Reads bytes [start, end] of an object (chunked uploads to social platforms). */
+  readRange(key: string, start: number, end: number): Promise<Buffer> {
+    return this.storage.getRange(key, start, end);
   }
 
   /** Signed URL for a file by id without a tenant context (e.g. org logo for its own members). */

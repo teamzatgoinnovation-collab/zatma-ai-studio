@@ -80,6 +80,28 @@
 * **Health:** a daily job refreshes grants that expire within 7 days and checks every account. When an account first needs re-authorisation, it writes an audit entry and emails the person who connected it.
 * **Permissions:** `social:read` lists accounts; `social:connect` (Owner, Admin, Marketing Manager) connects, assigns, checks and disconnects them. The plan's `socialAccounts` limit is enforced when accounts are added.
 
+## Social publishing (Phase 10)
+* **Explicit consent for outward actions:**
+  * Publishing now requires `{ confirm: true }` (400 without it), sent only after a dialog that lists every account.
+  * Scheduling is a deliberate choice of time.
+  * Nothing is published by default or retried after a permanent failure without a person clicking Retry.
+* **Approval model:**
+  * Permissions: `social:draft` (Designer and up) creates, edits and submits own drafts; `social:publish` (Owner, Admin, Marketing Manager) approves, rejects, schedules, publishes, cancels and retries.
+  * With *Require approval* on, every post needs approval, and approvers cannot approve their own posts unless they are Owner or Admin.
+  * Editing an approved post clears the approval (and unschedules it).
+* **Integrity:**
+  * Media must be files of the same organization that finished uploading; type and size come from storage, not the client.
+  * Accounts must be connected and available in the post's workspace.
+  * Platform rules are validated before scheduling and again before publishing.
+* **No duplicate posts:**
+  * A compare-and-set lock (`SCHEDULED` → `PUBLISHING` with the exact scheduled time) means only one job publishes a post; stale jobs after a reschedule do nothing.
+  * One publish runs at a time per account (Redis lock).
+  * Resumable progress is stored per account, so a retry continues where it stopped.
+* **Media URLs:** platform-fetch URLs are signed for 1 hour, created per attempt, and never logged or returned to clients. App previews use the usual 5-minute signed URLs.
+* **Recovery:** a sweeper every minute re-queues overdue posts and stuck uploads, so a restart or a lost Redis job delays a post but never drops it.
+* **Quota:** published plus scheduled posts per UTC month are checked when scheduling, publishing and retrying (402 `PLAN_LIMIT_REACHED`).
+* **PATCH semantics:** update schemas never inject defaults (`withoutDefaults`), so a partial update cannot reset fields it did not mention. This also fixed the CRM update endpoints; see the Phase 10 report.
+
 ## File uploads
 * Uploads use presigned PUT URLs to private buckets. The MIME allow-list is enforced, size is capped per plan, and keys are namespaced
   `org/<organizationId>/<uuid>`. Files are served through short-lived signed GET URLs.

@@ -45,6 +45,8 @@ model User {
   crmImports        CrmImport[]
   socialConnections SocialConnection[]
   socialAccounts    SocialAccount[]
+  socialPosts       SocialPost[]       @relation("PostCreator")
+  approvedPosts     SocialPost[]       @relation("PostApprover")
 
   @@map("user")
 }
@@ -116,6 +118,8 @@ model Organization {
   aiSettings      Json?
   /// CRM settings, e.g. { scoring: ScoringSettings }
   crmSettings     Json?
+  /// Publishing settings (socialSettingsSchema), e.g. { requireApproval }
+  socialSettings  Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt
 
@@ -140,6 +144,8 @@ model Organization {
   crmImports        CrmImport[]
   socialConnections SocialConnection[]
   socialAccounts    SocialAccount[]
+  socialPosts       SocialPost[]
+  socialPostTargets SocialPostTarget[]
   invoices          Invoice[]
   payments          Payment[]
 
@@ -192,6 +198,7 @@ model Workspace {
   brandKits    BrandKit[]
   designs      Design[]
   copyAssets   CopyAsset[]
+  socialPosts  SocialPost[]
 
   @@index([organizationId])
   @@map("workspace")
@@ -995,10 +1002,105 @@ model SocialAccount {
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   connection   SocialConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   connectedBy  User?            @relation(fields: [connectedById], references: [id], onDelete: SetNull)
+  postTargets  SocialPostTarget[]
 
   @@unique([organizationId, platform, externalId])
   @@index([organizationId, status])
   @@map("social_account")
+}
+
+enum SocialPostStatus {
+  DRAFT
+  PENDING_APPROVAL
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  PARTIALLY_PUBLISHED
+  FAILED
+  CANCELED
+}
+
+enum SocialPostTargetStatus {
+  PENDING
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  CANCELED
+}
+
+/// A social post (Phase 10): shared caption and media, published to one or more accounts (targets).
+model SocialPost {
+  id             String           @id @default(uuid(7))
+  organizationId String
+  workspaceId    String
+  caption        String           @default("")
+  hashtags       String[]         @default([])
+  /// postMediaSchema[]: file ids with kind, type, dimensions and duration
+  media          Json             @default("[]")
+  status         SocialPostStatus @default(DRAFT)
+  scheduledAt    DateTime?
+  timezone       String?
+  publishedAt    DateTime?
+  sourceDesignId String?
+  copyAssetId    String?
+  /// Campaign link; foreign key added with campaigns in Phase 12
+  campaignId     String?
+  createdById    String?
+  submittedAt    DateTime?
+  approvedById   String?
+  approvedAt     DateTime?
+  /// Approval or rejection note
+  reviewNote     String?
+  /// Optimistic concurrency counter, incremented on every content save
+  revision       Int              @default(0)
+  deletedAt      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy    User?              @relation("PostCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy   User?              @relation("PostApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  targets      SocialPostTarget[]
+
+  @@index([organizationId, status, scheduledAt])
+  @@index([organizationId, workspaceId, scheduledAt])
+  @@map("social_post")
+}
+
+/// One account a post goes to, with its own status, result and resumable upload state.
+model SocialPostTarget {
+  id              String                 @id @default(uuid(7))
+  organizationId  String
+  postId          String
+  /// Null once the account is disconnected (the snapshot fields keep history readable)
+  socialAccountId String?
+  platform        String
+  accountName     String
+  captionOverride String?
+  /// targetOptionsSchema (YouTube title, privacy, made for kids)
+  options         Json                   @default("{}")
+  status          SocialPostTargetStatus @default(PENDING)
+  attempts        Int                    @default(0)
+  /// Progress of multi-step uploads (container ids, upload sessions, created post id) so retries never repeat a step
+  providerState   Json                   @default("{}")
+  externalId      String?
+  externalUrl     String?
+  error           String?
+  errorCode       String?
+  lastAttemptAt   DateTime?
+  nextAttemptAt   DateTime?
+  publishedAt     DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  post         SocialPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  account      SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([postId, socialAccountId])
+  @@index([organizationId, status, publishedAt])
+  @@map("social_post_target")
 }
 
 /// Verified platform webhook deliveries (Meta), kept for publishing/analytics phases. Platform-level (not tenant scoped).

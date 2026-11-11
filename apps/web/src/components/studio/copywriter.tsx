@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, Copy, Languages, Loader2, Pencil, RefreshCw, Search, Sparkles, Star, Trash2, Undo2, Wand2 } from 'lucide-react';
+import { Bookmark, Copy, Languages, Loader2, Pencil, RefreshCw, Search, Send, Sparkles, Star, Trash2, Undo2, Wand2 } from 'lucide-react';
 import Link from 'next/link';
 import { useDeferredValue, useId, useState } from 'react';
 import { toast } from 'sonner';
@@ -745,6 +745,11 @@ function LibraryTab() {
                     <div className="mt-auto flex flex-wrap gap-1">
                       <Button size="sm" variant="ghost" onClick={() => void copyToClipboard(clipboardText(a.content, a.hashtags), 'Copied to clipboard')}>
                         <Copy aria-hidden="true" /> Copy
+                      </Button>
+                      <Button asChild size="sm" variant="ghost">
+                        <Link href={`/marketing/social/new?copy=${a.id}`}>
+                          <Send aria-hidden="true" /> Schedule post
+                        </Link>
                       </Button>
                       {canWrite && (
                         <>

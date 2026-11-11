@@ -12,12 +12,12 @@ describe('ModulePage', () => {
   });
 
   it('renders an honest roadmap layout for a planned module (no sample data)', () => {
-    const { section, leaf } = findNavEntry('/marketing/social')!;
+    const { section, leaf } = findNavEntry('/marketing/email')!;
     render(<ModulePage section={section} leaf={leaf} />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Social Media' })).toBeInTheDocument();
-    expect(screen.getByText('Social Media is coming in Phase 10')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Email Marketing' })).toBeInTheDocument();
+    expect(screen.getByText('Email Marketing is coming in Phase 14')).toBeInTheDocument();
     expect(screen.getByText(/Nothing on this page is sample data/)).toBeInTheDocument();
-    expect(screen.getByText('Platform-specific previews and validation')).toBeInTheDocument();
+    expect(screen.getByText('Bounce and unsubscribe handling')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Create a workspace per brand or client/ })).toHaveAttribute('href', '/dashboard');
   });
 });

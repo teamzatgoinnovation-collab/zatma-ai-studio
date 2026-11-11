@@ -13,6 +13,7 @@ import {
   CloudOff,
   CopyPlus,
   Download,
+  Send,
   Grid3x3,
   History,
   Languages,
@@ -588,6 +589,18 @@ function EditorWorkspace({
               <CopyPlus aria-hidden="true" />
             </Button>
           </>
+        )}
+
+        {dirty || saving ? (
+          <Button variant="outline" disabled title="Wait for the design to save">
+            <Send aria-hidden="true" /> Schedule post
+          </Button>
+        ) : (
+          <Button asChild variant="outline">
+            <Link href={`/marketing/social/new?design=${detail.id}`}>
+              <Send aria-hidden="true" /> Schedule post
+            </Link>
+          </Button>
         )}
 
         <DropdownMenu>

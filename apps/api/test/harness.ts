@@ -32,6 +32,11 @@ export class MemoryObjectStorage implements ObjectStorage {
     if (body.length > maxBytes) throw new ObjectTooLargeError(maxBytes);
     return body;
   }
+  async getRange(key: string, start: number, end: number) {
+    const body = this.bodies.get(key);
+    if (!body) throw new Error(`No object ${key}`);
+    return body.subarray(start, end + 1);
+  }
   async head(key: string) {
     return this.objects.get(key) ?? null;
   }

@@ -102,3 +102,18 @@ describe('CRM schemas', () => {
     expect(bulkLeadsSchema.safeParse({ ids, action: 'delete' }).success).toBe(true);
   });
 });
+
+describe('PATCH schemas keep omitted fields omitted', () => {
+  it('does not inject defaults into partial updates', async () => {
+    const v = await import('./crm.js');
+    expect(v.updateLeadSchema.parse({ firstName: 'Rahul' })).toEqual({ firstName: 'Rahul' });
+    expect(v.updateContactSchema.parse({ jobTitle: 'MD' })).toEqual({ jobTitle: 'MD' });
+    expect(v.updateCompanySchema.parse({ name: 'Nair Traders' })).toEqual({ name: 'Nair Traders' });
+    expect(v.updateDealSchema.parse({ name: 'Website' })).toEqual({ name: 'Website' });
+    expect(v.updateStageSchema.parse({ name: 'Won' })).toEqual({ name: 'Won' });
+    // Explicit values still validate and pass through.
+    expect(v.updateLeadSchema.parse({ status: 'QUALIFIED', tags: ['vip'] })).toEqual({ status: 'QUALIFIED', tags: ['vip'] });
+    expect(v.updateLeadSchema.safeParse({ status: 'NOPE' }).success).toBe(false);
+    expect(v.updateLeadSchema.safeParse({ unknownField: 1 }).success).toBe(false);
+  });
+});

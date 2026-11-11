@@ -88,6 +88,7 @@ export const envSchema = z
     GOOGLE_TOKEN_URL: z.url().default('https://oauth2.googleapis.com/token'),
     GOOGLE_REVOKE_URL: z.url().default('https://oauth2.googleapis.com/revoke'),
     YOUTUBE_API_URL: z.url().default('https://www.googleapis.com/youtube/v3'),
+    YOUTUBE_UPLOAD_URL: z.url().default('https://www.googleapis.com/upload/youtube/v3'),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.BETTER_AUTH_SECRET.startsWith('change-me')) {

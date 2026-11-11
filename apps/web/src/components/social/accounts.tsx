@@ -16,7 +16,7 @@ import { oauthErrorMessage, PLATFORM_MARK, platformLabel, sortAccounts, STATUS_B
 const describeError = (e: unknown) => (e instanceof ApiError ? e.message : (e as Error).message);
 const RETURN_TO = '/marketing/accounts';
 
-function PlatformMark({ platform, className }: { platform: SocialPlatform; className?: string }) {
+export function PlatformMark({ platform, className }: { platform: SocialPlatform; className?: string }) {
   const m = PLATFORM_MARK[platform];
   return (
     <span aria-hidden="true" className={cn('grid size-10 shrink-0 place-items-center rounded-xl text-sm font-bold', m.className, className)}>

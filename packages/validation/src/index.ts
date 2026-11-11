@@ -102,22 +102,39 @@ export const UPLOAD_MIME_TYPES = [
   'image/webp',
   'image/svg+xml',
   'video/mp4',
+  'video/quicktime',
   'application/pdf',
   'text/csv',
 ] as const;
-export const UPLOAD_PURPOSES = ['LOGO', 'BRAND_ASSET', 'DESIGN_ASSET', 'THUMBNAIL', 'IMPORT', 'OTHER'] as const;
+export const UPLOAD_PURPOSES = ['LOGO', 'BRAND_ASSET', 'DESIGN_ASSET', 'THUMBNAIL', 'IMPORT', 'POST_MEDIA', 'OTHER'] as const;
 /** Purposes only the server assigns (never accepted from upload requests). */
 export const SERVER_FILE_PURPOSES = ['AI_IMAGE'] as const;
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+/** Social post media (Phase 10): larger videos, smaller images (platform limits). */
+export const MAX_POST_IMAGE_BYTES = 20 * 1024 * 1024;
+export const MAX_POST_VIDEO_BYTES = 250 * 1024 * 1024;
+const POST_MEDIA_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/quicktime']);
+
+/** Largest size allowed for an upload of this purpose and type. */
+export function maxUploadBytes(purpose: string, mimeType: string): number {
+  if (purpose !== 'POST_MEDIA') return MAX_UPLOAD_BYTES;
+  return mimeType.startsWith('video/') ? MAX_POST_VIDEO_BYTES : MAX_POST_IMAGE_BYTES;
+}
 
 export const presignUploadSchema = z
   .object({
     fileName: trimmed(1, 200),
     mimeType: z.enum(UPLOAD_MIME_TYPES),
-    sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+    sizeBytes: z.number().int().positive().max(MAX_POST_VIDEO_BYTES),
     purpose: z.enum(UPLOAD_PURPOSES).default('OTHER'),
   })
-  .strict();
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.purpose === 'POST_MEDIA' && !POST_MEDIA_MIME.has(v.mimeType)) ctx.addIssue({ code: 'custom', path: ['mimeType'], message: 'Post media must be a PNG, JPEG, WebP, MP4 or MOV file' });
+    if (v.purpose !== 'POST_MEDIA' && v.mimeType === 'video/quicktime') ctx.addIssue({ code: 'custom', path: ['mimeType'], message: 'MOV files are only accepted for post media' });
+    const max = maxUploadBytes(v.purpose, v.mimeType);
+    if (v.sizeBytes > max) ctx.addIssue({ code: 'custom', path: ['sizeBytes'], message: `File must be at most ${Math.round(max / 1024 / 1024)} MB` });
+  });
 export type PresignUploadInput = z.infer<typeof presignUploadSchema>;
 
 // ── Phase 2: auth flows ──
@@ -213,3 +230,5 @@ export * from './copy.js';
 export * from './crm.js';
 export * from './scoring.js';
 export * from './social.js';
+export * from './publishing.js';
+export { withoutDefaults } from './patch.js';

@@ -24,6 +24,19 @@ const LABELS: Record<string, string> = {
   'social.account_updated': 'changed a social account’s workspaces',
   'social.account_disconnected': 'disconnected a social account',
   'social.reauth_required': 'was told a social account needs reconnecting',
+  'social.post_created': 'created a social post',
+  'social.post_submitted': 'submitted a post for approval',
+  'social.post_approved': 'approved a post',
+  'social.post_rejected': 'requested changes to a post',
+  'social.post_scheduled': 'scheduled a post',
+  'social.post_unscheduled': 'unscheduled a post',
+  'social.post_publish_requested': 'published a post',
+  'social.post_published': 'had a post published',
+  'social.post_partially_published': 'had a post partly published',
+  'social.post_failed': 'had a post fail to publish',
+  'social.post_retried': 'retried a failed post',
+  'social.post_deleted': 'deleted a post',
+  'social.settings_updated': 'changed publishing approvals',
 };
 
 /** Human-readable sentence for an audit action code (falls back to the code itself). */

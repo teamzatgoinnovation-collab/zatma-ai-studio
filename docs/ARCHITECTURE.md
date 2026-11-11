@@ -216,3 +216,18 @@ ESM natively, using SWC to emit decorator metadata. Jest would need experimental
 
 **Why Prisma 7 rather than 8:** Prisma 8 is still a release candidate, and Better Auth's peer
 range is `prisma ^7`.
+
+## Social publishing (Phase 10)
+
+The flow is `PublishingService` (API) → `social-publish` queue → `PublishingWorkerService`:
+1. **Schedule or publish now:** the post becomes `SCHEDULED` and a delayed job `post-<id>-<scheduledAtMs>` is queued. Rescheduling or cancelling removes it, and stale jobs are ignored by a compare-and-set.
+2. **Post job:** `SCHEDULED` → `PUBLISHING`, then one `target` job per account.
+3. **Target job:**
+   * Takes the per-account Redis lock.
+   * Builds the request: token from `SocialService.publishingTarget`, final text from `composeText`, media as signed URLs or byte ranges.
+   * Calls the platform adapter's `publish()` and persists `providerState` after every step.
+   * The outcome is *published*, *processing* (re-queued after `retryAfterMs`), *retryable* (backoff, up to 5 attempts), *auth* (account flagged, email) or *permanent* (failure email).
+4. **Finalize:** when every target is done, the post becomes `PUBLISHED`, `PARTIALLY_PUBLISHED` or `FAILED` (compare-and-set, audited once).
+5. **Sweeper** (every minute): re-queues overdue scheduled posts and stuck targets, and settles finished posts.
+
+On the web, the composer validates live with the shared `validatePost` (`packages/validation/src/publishing.ts`), the same rules the API enforces.
