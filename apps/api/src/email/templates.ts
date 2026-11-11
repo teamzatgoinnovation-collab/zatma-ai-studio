@@ -41,6 +41,24 @@ ${footnote ? `<p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8">$
 type Template = Omit<EmailMessage, 'to'>;
 
 export const emailTemplates = {
+  socialReauth(input: { name: string; accountName: string; platformLabel: string; reason: string; url: string }): Template {
+    return {
+      tag: 'social-reauth',
+      subject: `Reconnect ${input.accountName} (${input.platformLabel}) on ZatGo AI Marketing`,
+      ...layout({
+        preheader: `${input.accountName} needs to be reconnected before you can publish to it.`,
+        heading: 'Reconnect your account',
+        paragraphs: [
+          `Hi ${input.name}, ZatGo AI Marketing can no longer access ${input.accountName} (${input.platformLabel}).`,
+          `Reason reported by the platform: ${input.reason}`,
+          'Scheduled posts to this account will not publish until you reconnect it.',
+        ],
+        action: { label: 'Reconnect account', url: input.url },
+        footnote: 'You are receiving this because you connected this account.',
+      }),
+    };
+  },
+
   verifyEmail(input: { name: string; url: string }): Template {
     return {
       tag: 'verify-email',

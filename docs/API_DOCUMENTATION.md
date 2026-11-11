@@ -251,3 +251,24 @@ Error codes:
 `GET /crm/summary` also returns `leadsByGrade` and `callFirst` (the top five open leads by score, scoped to what the user can see).
 
 Error codes: `AI_PROVIDER_UNAVAILABLE` (503), `PLAN_LIMIT_REACHED` (402), `AI_OUTPUT_INVALID` (422).
+
+## Phase 9 endpoints
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/social/providers` | `social:read` | `[{ id: meta\|linkedin\|google, name, platforms[], configured, unavailableReason, scopes[], redirectUri }]` |
+| POST | `/social/connect/:provider` | `social:connect` | `{ returnTo?: "/path", reconnectConnectionId? }` → `{ authorizeUrl }`. Navigate the browser there. Throttled to 20/min. `503 SOCIAL_PROVIDER_NOT_CONFIGURED` when keys are missing |
+| GET | `/social/oauth/:provider/callback` | public (session checked) | Platform redirect target. Validates the single-use state against the signed-in user, stores the encrypted grant, then 302s to `WEB_URL{returnTo}?connection=<id>` or `?error=access_denied\|invalid_state\|provider_error\|not_configured&provider=` |
+| GET | `/social/connections/:id/available` | `social:connect` | Pages, Instagram accounts, LinkedIn Pages or channels the grant can manage: `[{ platform, externalId, name, username, avatarUrl, alreadyAdded }]` |
+| GET | `/social/accounts` | `social:read` | `SocialAccountDto[]`: `{ id, platform, externalId, name, username, avatarUrl, status: ACTIVE\|NEEDS_REAUTH\|ERROR\|DISCONNECTED, lastCheckedAt, lastError, workspaceIds[], connection: { id, provider, displayName, status, expiresAt, scopes }, connectedBy }`. No tokens |
+| POST | `/social/accounts` | `social:connect` | `{ connectionId, externalIds[], workspaceIds? }` → the added accounts (upsert; `402 PLAN_LIMIT_REACHED`, `422 ACCOUNT_NOT_AVAILABLE`, `404` for unknown workspaces) |
+| PATCH | `/social/accounts/:id` | `social:connect` | `{ workspaceIds[] }` (empty means every workspace) |
+| POST | `/social/accounts/:id/check` | `social:connect` | Runs a health check now (refreshing the grant first if it is about to expire) and returns the account |
+| DELETE | `/social/accounts/:id` | `social:connect` | 204. Revokes and deletes the grant when no other account uses it |
+| GET | `/social/webhooks/meta` | public | Meta verification challenge (`hub.verify_token`) |
+| POST | `/social/webhooks/meta` | public, signed | `X-Hub-Signature-256` over the raw body; events are stored in `social_webhook_event`. `permissions` revocations mark grants REVOKED |
+| POST | `/social/meta/deauthorize` | public, `signed_request` | Marks the person's grants REVOKED |
+| POST | `/social/meta/data-deletion` | public, `signed_request` | Deletes the person's grants and accounts → `{ url, confirmation_code }` |
+| GET | `/social/meta/data-deletion/:code` | public | Deletion status page for Meta |
+
+Error codes: `SOCIAL_PROVIDER_NOT_CONFIGURED` (503), `SOCIAL_REAUTH_REQUIRED` (409), `SOCIAL_PROVIDER_ERROR` (502), `ACCOUNT_NOT_AVAILABLE` (422), `INVALID_SIGNATURE` (401), `INVALID_SIGNED_REQUEST` (400).
