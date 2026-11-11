@@ -53,7 +53,8 @@ export function configureApp(app: NestExpressApplication): NestExpressApplicatio
       limit: '1mb',
       // Payment webhooks are signed over the exact bytes received.
       verify: (req, _res, buf) => {
-        if ((req as express.Request).originalUrl?.startsWith('/api/v1/billing/webhooks/')) (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+        const url = (req as express.Request).originalUrl ?? '';
+        if (url.startsWith('/api/v1/billing/webhooks/') || url.startsWith('/api/v1/social/webhooks/')) (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
       },
     }),
   );

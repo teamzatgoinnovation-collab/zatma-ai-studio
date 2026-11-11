@@ -10,8 +10,8 @@
 | 5 | AI Design Studio | ✅ Completed |
 | 6 | AI Copywriter | ✅ Completed |
 | 7 | CRM core | ✅ Completed |
-| 8 | AI lead scoring & intelligence | ✅ Completed (awaiting approval for Phase 9) |
-| 9 | Social media account integration | ⏳ Pending |
+| 8 | AI lead scoring & intelligence | ✅ Completed |
+| 9 | Social media account integration | ✅ Completed (awaiting approval for Phase 10; real accounts need app keys) |
 | 10 | Social content management | ⏳ Pending |
 | 11 | Meta Ads manager | ⏳ Pending |
 | 12 | Campaign management | ⏳ Pending |
@@ -659,3 +659,89 @@ The 7 scoring e2e tests cover:
 
 ### Next phase
 **Phase 9: Social media account integration.** OAuth connections for Facebook Pages, Instagram Business, LinkedIn and YouTube, with encrypted token storage, refresh, health checks and account selection per workspace. This needs app credentials from each platform.
+
+## Phase 9: Social media account integration (✅ Completed; platform keys pending)
+
+### Features implemented
+* **Platforms:** Facebook Pages and Instagram Business accounts (Meta), LinkedIn company Pages, and YouTube channels. Each uses the platform's official OAuth and REST API (`apps/api/src/social/providers/`), with `fetch` only and no SDKs.
+  * **Meta:** Facebook Login dialog; code exchange, then a long-lived token (`fb_exchange_token`); `/me/accounts` with pagination for Pages, their Page tokens and linked Instagram Business accounts. `appsecret_proof` is sent on every call. Graph error 190 and similar map to "reconnect needed".
+  * **LinkedIn:** 3-legged OAuth; `organizationAcls` (approved ADMINISTRATOR) then `organizations/{id}`. Versioned REST headers; refresh and revoke.
+  * **YouTube:** Google OAuth with PKCE, offline access and forced consent; `channels?mine=true`; refresh (`invalid_grant` means reconnect needed); revoke.
+* **A platform is enabled only when its keys are set.** Otherwise the UI shows *Not configured* with the exact variables an admin must set and a link to the setup guide. Nothing is faked.
+* **Encrypted token storage:**
+  * AES-256-GCM `TokenCipher` with key ids for rotation, and the row identity bound as associated data.
+  * Grants (`social_connection`) are stored separately from publishable accounts (`social_account`), so one login can provide many Pages.
+* **Connect flow:**
+  * Server-side single-use OAuth state (Redis, 10 minutes) bound to the signed-in user, with a same-site return path.
+  * A friendly result when the user cancels or the link expires.
+  * After the redirect, the **Choose accounts** dialog lists every Page, Instagram account, LinkedIn Page or channel the login can manage, marks the ones already connected, and assigns them to workspaces.
+  * **Reconnect** updates the same grant in place and reactivates its accounts.
+* **Account management:**
+  * Status badges (Active / Reconnect needed / Error), last check time and who connected the account.
+  * **Check now**; **Workspaces** (empty means all); **Disconnect** with confirmation. Disconnecting the last account of a login revokes it on the platform and deletes the tokens.
+  * A plan usage meter. The `socialAccounts` plan limit is now real: it counts connected accounts and is enforced when adding.
+* **Token health:**
+  * Tokens are refreshed automatically within 5 minutes of expiry.
+  * A daily BullMQ job (`social-health`, 22:15 UTC) refreshes grants that expire within 7 days, flags Meta grants for reconnection 7 days before expiry (Meta user tokens can't be refreshed), and checks every account.
+  * The first time an account needs re-authorisation, it writes an activity entry and emails the person who connected it.
+* **Meta platform callbacks:**
+  * Webhook verification challenge, and signed events (`X-Hub-Signature-256` over the raw body) stored for later phases.
+  * `permissions` revocations, the deauthorize callback and the data-deletion callback (with confirmation URL and status page) are all handled.
+* **Web:** a new live nav leaf, **Marketing → Social Accounts** (`/marketing/accounts`), with provider cards, the account picker, a workspaces dialog, error alerts, and a read-only view for users without `social:connect`. Activity-feed labels were added for all social events.
+
+### Database changes
+Migration `20261111024432_phase9_social_accounts`:
+* New enums: `SocialConnectionStatus`, `SocialAccountStatus`.
+* New tables: `social_connection`, `social_account` (both tenant-scoped through the Prisma tenant extension) and `social_webhook_event`.
+
+### APIs
+See `API_DOCUMENTATION.md` → Phase 9 endpoints. New env variables are listed in `apps/api/.env.example` and in `INTEGRATIONS.md` → Social accounts.
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Validation unit (connect, return-path and account schemas) | ✅ 34 passed (2 new) |
+| API unit (token cipher: round trip, tampering, wrong associated data, rotation; each adapter against a fake `fetch`: URLs, scopes, PKCE, long-lived upgrade, pagination, error mapping) | ✅ 91 passed (13 new) |
+| API e2e | ✅ 102 passed (9 new) |
+| Web unit (error messages, workspace summary, sorting) | ✅ 59 passed (3 new) |
+| Lint, typecheck, build | ✅ |
+
+The 9 social e2e tests cover:
+* The providers list and the *Not configured* state (503).
+* The connect round trip, with encrypted tokens at rest and the associated data checked.
+* Rejected callbacks: reused state, another user's state, no session, cancelled, failed exchange, and an absolute `returnTo`.
+* PKCE and automatic refresh for YouTube.
+* Re-auth detection with the email and audit entry, then reconnecting in place.
+* The health job: Meta grants near expiry, and failed refreshes.
+* Meta webhooks: challenge, valid and invalid signatures, deauthorize, data deletion and its status page.
+* Disconnect revoking the grant only after the last account.
+* Plan limit (402), tenant isolation (404), Viewer read-only and Marketing Manager connect.
+* No token or ciphertext appears in any response.
+
+**Browser run (Playwright, production build, API pointed at a local stand-in for Meta, LinkedIn and Google):** 25 checks passed with no console errors. The stand-in checks client secrets, redirect URIs, `appsecret_proof` and PKCE the way the real services do.
+* Three platforms shown as configured.
+* Meta: the redirect returns to a clean URL; the picker shows 2 Pages and 1 Instagram account; one Page and its Instagram account are connected to the "Kochi Store" workspace.
+* LinkedIn and YouTube were connected, with PKCE used for YouTube.
+* The usage meter showed 4 of 10.
+* Check now worked.
+* After the YouTube grant was invalidated: *Reconnect needed*, the email was sent, Reconnect worked, and the account was Active again.
+* The workspace change was saved.
+* Disconnecting LinkedIn revoked the token at the platform.
+* No tokens in API responses.
+* The error alert was shown.
+* axe found no serious or critical violations: empty, picker, connected, reconnect, dark theme, and *Not configured* (API restarted without keys).
+* No horizontal scroll on mobile.
+
+### Remaining issues / notes
+* **Real accounts need platform credentials and approvals:**
+  * Meta App Review and Business Verification.
+  * LinkedIn Community Management API access.
+  * Google OAuth consent-screen verification for the YouTube scopes.
+
+  Setup steps, redirect URIs and webhook URLs are in `INTEGRATIONS.md`. Not tested against live platform APIs yet.
+* **TikTok and Pinterest** are not part of this phase. They follow the same adapter interface when added.
+* **Webhook events are stored but not yet acted on** (beyond revocations). Phases 10 and 13 consume them.
+* **The health job time** (22:15 UTC) is platform-wide.
+
+### Next phase
+**Phase 10: Social content management.** Compose posts with platform previews and validation, a content calendar, scheduling, and publishing to the accounts connected here, with status tracking and retries.

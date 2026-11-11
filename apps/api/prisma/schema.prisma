@@ -25,24 +25,26 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions       Session[]
-  accounts       Account[]
-  members        Member[]
-  invitations    Invitation[]
-  auditLogs      AuditLog[]
-  files          StoredFile[]
-  aiUsage        AiUsage[]
-  generationJobs GenerationJob[]
-  designs        Design[]
-  designVersions DesignVersion[]
-  copyAssets     CopyAsset[]
-  ownedLeads     Lead[]          @relation("LeadOwner")
-  ownedContacts  Contact[]       @relation("ContactOwner")
-  ownedCompanies Company[]       @relation("CompanyOwner")
-  ownedDeals     Deal[]          @relation("DealOwner")
-  activities     Activity[]      @relation("ActivityOwner")
-  createdActs    Activity[]      @relation("ActivityCreator")
-  crmImports     CrmImport[]
+  sessions          Session[]
+  accounts          Account[]
+  members           Member[]
+  invitations       Invitation[]
+  auditLogs         AuditLog[]
+  files             StoredFile[]
+  aiUsage           AiUsage[]
+  generationJobs    GenerationJob[]
+  designs           Design[]
+  designVersions    DesignVersion[]
+  copyAssets        CopyAsset[]
+  ownedLeads        Lead[]             @relation("LeadOwner")
+  ownedContacts     Contact[]          @relation("ContactOwner")
+  ownedCompanies    Company[]          @relation("CompanyOwner")
+  ownedDeals        Deal[]             @relation("DealOwner")
+  activities        Activity[]         @relation("ActivityOwner")
+  createdActs       Activity[]         @relation("ActivityCreator")
+  crmImports        CrmImport[]
+  socialConnections SocialConnection[]
+  socialAccounts    SocialAccount[]
 
   @@map("user")
 }
@@ -117,27 +119,29 @@ model Organization {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt
 
-  members        Member[]
-  invitations    Invitation[]
-  workspaces     Workspace[]
-  subscription   Subscription?
-  auditLogs      AuditLog[]
-  files          StoredFile[]
-  aiUsage        AiUsage[]
-  generationJobs GenerationJob[]
-  brandKits      BrandKit[]
-  designs        Design[]
-  templates      Template[]
-  copyAssets     CopyAsset[]
-  leads          Lead[]
-  contacts       Contact[]
-  companies      Company[]
-  pipelines      Pipeline[]
-  deals          Deal[]
-  activities     Activity[]
-  crmImports     CrmImport[]
-  invoices       Invoice[]
-  payments       Payment[]
+  members           Member[]
+  invitations       Invitation[]
+  workspaces        Workspace[]
+  subscription      Subscription?
+  auditLogs         AuditLog[]
+  files             StoredFile[]
+  aiUsage           AiUsage[]
+  generationJobs    GenerationJob[]
+  brandKits         BrandKit[]
+  designs           Design[]
+  templates         Template[]
+  copyAssets        CopyAsset[]
+  leads             Lead[]
+  contacts          Contact[]
+  companies         Company[]
+  pipelines         Pipeline[]
+  deals             Deal[]
+  activities        Activity[]
+  crmImports        CrmImport[]
+  socialConnections SocialConnection[]
+  socialAccounts    SocialAccount[]
+  invoices          Invoice[]
+  payments          Payment[]
 
   @@map("organization")
 }
@@ -922,4 +926,93 @@ model CrmImport {
 
   @@index([organizationId, createdAt])
   @@map("crm_import")
+}
+
+// ───────────────────────────── Social accounts (Phase 9) ─────────────────────────────
+
+enum SocialConnectionStatus {
+  ACTIVE
+  NEEDS_REAUTH
+  REVOKED
+}
+
+enum SocialAccountStatus {
+  ACTIVE
+  NEEDS_REAUTH
+  ERROR
+  DISCONNECTED
+}
+
+/// One OAuth grant (a person authorised the app on a platform). Tokens are AES-256-GCM encrypted.
+model SocialConnection {
+  id                    String                 @id @default(uuid(7))
+  organizationId        String
+  provider              String
+  connectedById         String?
+  externalUserId        String
+  displayName           String?
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String?
+  expiresAt             DateTime?
+  scopes                String[]               @default([])
+  status                SocialConnectionStatus @default(ACTIVE)
+  lastRefreshedAt       DateTime?
+  lastError             String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectedBy  User?           @relation(fields: [connectedById], references: [id], onDelete: SetNull)
+  accounts     SocialAccount[]
+
+  @@unique([organizationId, provider, externalUserId])
+  @@index([organizationId])
+  @@map("social_connection")
+}
+
+/// A publishing destination: Facebook Page, Instagram Business account, LinkedIn Page or YouTube channel.
+model SocialAccount {
+  id                    String              @id @default(uuid(7))
+  organizationId        String
+  connectionId          String
+  platform              String
+  externalId            String
+  name                  String
+  username              String?
+  avatarUrl             String?
+  /// Account-level token where the platform issues one (Meta page token), encrypted
+  accountTokenEncrypted String?
+  capabilities          Json                @default("{}")
+  status                SocialAccountStatus @default(ACTIVE)
+  lastCheckedAt         DateTime?
+  lastError             String?
+  /// Workspaces that may publish to this account (empty = all)
+  workspaceIds          String[]            @default([])
+  connectedById         String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connection   SocialConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connectedBy  User?            @relation(fields: [connectedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, platform, externalId])
+  @@index([organizationId, status])
+  @@map("social_account")
+}
+
+/// Verified platform webhook deliveries (Meta), kept for publishing/analytics phases. Platform-level (not tenant scoped).
+model SocialWebhookEvent {
+  id             String    @id @default(uuid(7))
+  provider       String
+  object         String?
+  objectId       String?
+  field          String?
+  payload        Json
+  organizationId String?
+  receivedAt     DateTime  @default(now())
+  processedAt    DateTime?
+
+  @@index([provider, receivedAt])
+  @@map("social_webhook_event")
 }

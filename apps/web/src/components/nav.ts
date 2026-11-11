@@ -116,6 +116,7 @@ export const NAV: NavSection[] = [
     description: 'Campaigns, social publishing, calendar, email, WhatsApp and automation.',
     children: [
       { label: 'Campaigns', href: '/marketing/campaigns', phase: 12, description: 'Plan and run multi-channel campaigns.', features: ['Campaign types, budget and audience', 'Assets and schedule', 'Leads and conversion tracking'] },
+      { label: 'Social Accounts', href: '/marketing/accounts', description: 'Connect Facebook Pages, Instagram, LinkedIn Pages and YouTube channels.', keywords: ['connect', 'oauth', 'facebook', 'instagram', 'linkedin', 'youtube'] },
       { label: 'Social Media', href: '/marketing/social', phase: 10, description: 'Compose, preview and publish to connected accounts.', features: ['Facebook, Instagram, LinkedIn, YouTube, TikTok, Pinterest', 'Platform-specific previews and validation', 'Publishing status and retries'] },
       { label: 'Content Calendar', href: '/marketing/calendar', phase: 10, description: 'Month, week, day and list views of scheduled content.', features: ['Time-zone aware scheduling', 'Drag to reschedule'] },
       { label: 'Email Marketing', href: '/marketing/email', phase: 14, description: 'Templates, segments and email campaigns.', features: ['Personalisation and scheduling', 'Bounce and unsubscribe handling', 'Delivery analytics'] },

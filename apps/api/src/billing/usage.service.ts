@@ -33,7 +33,7 @@ export class UsageService {
     const db = this.prisma.system;
     const { subscription } = await this.effectivePlan(organizationId);
     const periodStart = subscription?.currentPeriodStart ?? new Date(Date.now() - 30 * 24 * 3600 * 1000);
-    const [members, pendingInvitations, workspaces, storage, credits, leads, contacts] = await Promise.all([
+    const [members, pendingInvitations, workspaces, storage, credits, leads, contacts, socialAccounts] = await Promise.all([
       db.member.count({ where: { organizationId } }),
       db.invitation.count({ where: { organizationId, status: 'pending', expiresAt: { gt: new Date() } } }),
       db.workspace.count({ where: { organizationId } }),
@@ -41,13 +41,14 @@ export class UsageService {
       db.aiUsage.aggregate({ where: { organizationId, createdAt: { gte: periodStart } }, _sum: { credits: true } }),
       db.lead.count({ where: { organizationId, deletedAt: null } }),
       db.contact.count({ where: { organizationId, deletedAt: null } }),
+      db.socialAccount.count({ where: { organizationId, status: { not: 'DISCONNECTED' } } }),
     ]);
     return {
       members: members + pendingInvitations,
       workspaces,
       storageMb: Math.ceil((storage._sum.sizeBytes ?? 0) / (1024 * 1024)),
       aiCredits: credits._sum.credits ?? 0,
-      socialAccounts: 0, // Phase 9
+      socialAccounts,
       crmRecords: leads + contacts,
     };
   }

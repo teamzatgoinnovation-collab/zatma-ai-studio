@@ -31,8 +31,8 @@
 ## Secrets
 * All secrets come from environment variables, validated at boot. `.env` is git-ignored and `.env.example` documents the variables.
 * AI and payment provider keys exist only in the API process. Nothing is exposed to `NEXT_PUBLIC_*`.
-* Third-party OAuth tokens (Meta, LinkedIn, …) are stored encrypted with AES-256-GCM under
-  `TOKEN_ENCRYPTION_KEY`. They are never returned in API responses (Phase 9).
+* Third-party OAuth tokens (Meta, LinkedIn, YouTube) are stored encrypted (see *Social account tokens*). They are never
+  returned in API responses or written to logs.
 
 ## Input & output
 * All input is validated with Zod (shared schemas in `packages/validation`). Unknown keys are stripped.
@@ -56,6 +56,29 @@
 * Prompts for insights and drafted messages contain only the requesting organization's own record (lead or contact fields, recent activity subjects and bodies, score signals) and its brand kit. Ownership scoping applies before anything is sent, so Sales Agents cannot generate insights for colleagues' leads.
 * AI output is advisory. It cannot change scores, statuses or owners, and messages are never sent automatically.
 * Calls are metered (purpose `crm`) against the plan's AI credits, and throttled to 20/min per client.
+
+## Social account tokens (Phase 9)
+* **Encryption at rest:** AES-256-GCM with a random 96-bit IV per value, stored as `v1.<kid>.<iv>.<tag>.<ciphertext>`.
+  * Keys come from `TOKEN_ENCRYPTION_KEYS` (`kid:base64(32 bytes)`, comma-separated). The first key encrypts and all keys decrypt, which allows rotation.
+  * The organization, provider or platform, and external id are bound as **additional authenticated data**, so a ciphertext copied to another row or tenant fails to decrypt.
+  * The API refuses to boot if a platform is configured without encryption keys.
+* **OAuth state:** 32 random bytes, stored server-side in Redis for 10 minutes and single-use (`GETDEL`).
+  * The state carries the organization, the user, the PKCE verifier and a same-site `returnTo` path (absolute URLs are rejected, which prevents open redirects).
+  * The callback only stores a grant when the **signed-in session user matches** the user who started the flow. Anything else, including reuse, expiry or a logged-out browser, ends in `?error=invalid_state`.
+* **PKCE (S256)** for Google. Meta calls add `appsecret_proof` (HMAC-SHA256 of the token with the app secret).
+* **Least exposure:**
+  * DTOs expose only status, names and expiry.
+  * Tokens are decrypted only inside the API for an outbound platform call.
+  * Platform errors are trimmed and never include tokens.
+* **Revocation:** disconnecting the last account of a login revokes the grant on the platform (Meta `DELETE /me/permissions`, LinkedIn `/revoke`, Google `/revoke`) before the tokens are deleted.
+  * Meta deauthorize callbacks and `permissions` webhooks mark grants **REVOKED**.
+  * Data-deletion requests delete the grants and the accounts added through them, and return Meta's confirmation URL and code.
+* **Webhooks and callbacks:**
+  * Meta webhooks verify `X-Hub-Signature-256` over the raw body in constant time (401 otherwise).
+  * The GET challenge needs `META_WEBHOOK_VERIFY_TOKEN`.
+  * `signed_request` payloads are HMAC-verified.
+* **Health:** a daily job refreshes grants that expire within 7 days and checks every account. When an account first needs re-authorisation, it writes an audit entry and emails the person who connected it.
+* **Permissions:** `social:read` lists accounts; `social:connect` (Owner, Admin, Marketing Manager) connects, assigns, checks and disconnects them. The plan's `socialAccounts` limit is enforced when accounts are added.
 
 ## File uploads
 * Uploads use presigned PUT URLs to private buckets. The MIME allow-list is enforced, size is capped per plan, and keys are namespaced

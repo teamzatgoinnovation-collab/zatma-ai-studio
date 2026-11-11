@@ -24,6 +24,14 @@ import type {
   Workspace,
 } from '@zatma/types';
 import type {
+  AddSocialAccountsInput,
+  AvailableSocialAccount,
+  ConnectSocialInput,
+  SocialAccountDto,
+  SocialProviderId,
+  SocialProviderInfo,
+} from '@zatma/validation';
+import type {
   DraftMessageInput,
   DraftMessageResult,
   LeadInsights,
@@ -283,6 +291,17 @@ export function createApiClient(options: ApiClientOptions) {
         start: (input: Partial<ImportInput> & Pick<ImportInput, 'fileId' | 'entity' | 'mapping'>) => request<ImportJobStatus>('POST', '/crm/import', input),
         status: (importId: string) => request<ImportJobStatus>('GET', `/crm/import/${id(importId)}`),
       },
+    },
+    social: {
+      providers: () => request<SocialProviderInfo[]>('GET', '/social/providers'),
+      /** Starts OAuth; navigate the browser to `authorizeUrl`. */
+      connect: (provider: SocialProviderId, input: ConnectSocialInput = {}) => request<{ authorizeUrl: string }>('POST', `/social/connect/${id(provider)}`, input),
+      available: (connectionId: string) => request<AvailableSocialAccount[]>('GET', `/social/connections/${id(connectionId)}/available`),
+      accounts: () => request<SocialAccountDto[]>('GET', '/social/accounts'),
+      add: (input: Partial<AddSocialAccountsInput> & Pick<AddSocialAccountsInput, 'connectionId' | 'externalIds'>) => request<SocialAccountDto[]>('POST', '/social/accounts', input),
+      update: (accountId: string, input: { workspaceIds: string[] }) => request<SocialAccountDto>('PATCH', `/social/accounts/${id(accountId)}`, input),
+      check: (accountId: string) => request<SocialAccountDto>('POST', `/social/accounts/${id(accountId)}/check`),
+      remove: (accountId: string) => request<void>('DELETE', `/social/accounts/${id(accountId)}`),
     },
     copyAssets: {
       list: (query?: { page?: number; pageSize?: number; q?: string; kind?: string; language?: string; favorite?: 'true' | 'false' }) =>

@@ -65,6 +65,29 @@ export const envSchema = z
     BILLING_GRACE_DAYS: z.coerce.number().int().min(0).max(30).default(7),
 
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
+
+    // ── Social accounts (Phase 9). Each platform is enabled only when its keys are set. ──
+    /** Comma-separated `kid:base64(32 bytes)` keys; the first encrypts new tokens, all decrypt (rotation). */
+    TOKEN_ENCRYPTION_KEYS: optional,
+    META_APP_ID: optional,
+    META_APP_SECRET: optional,
+    /** Token you choose and enter in the Meta webhook settings (GET challenge). */
+    META_WEBHOOK_VERIFY_TOKEN: optional,
+    META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v24.0'),
+    META_GRAPH_URL: z.url().default('https://graph.facebook.com'),
+    META_OAUTH_URL: z.url().default('https://www.facebook.com'),
+    LINKEDIN_CLIENT_ID: optional,
+    LINKEDIN_CLIENT_SECRET: optional,
+    /** LinkedIn Marketing API version header (YYYYMM). */
+    LINKEDIN_API_VERSION: z.string().regex(/^\d{6}$/).default('202510'),
+    LINKEDIN_API_URL: z.url().default('https://api.linkedin.com'),
+    LINKEDIN_OAUTH_URL: z.url().default('https://www.linkedin.com/oauth/v2'),
+    YOUTUBE_CLIENT_ID: optional,
+    YOUTUBE_CLIENT_SECRET: optional,
+    GOOGLE_OAUTH_URL: z.url().default('https://accounts.google.com/o/oauth2/v2/auth'),
+    GOOGLE_TOKEN_URL: z.url().default('https://oauth2.googleapis.com/token'),
+    GOOGLE_REVOKE_URL: z.url().default('https://oauth2.googleapis.com/revoke'),
+    YOUTUBE_API_URL: z.url().default('https://www.googleapis.com/youtube/v3'),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.BETTER_AUTH_SECRET.startsWith('change-me')) {
@@ -79,6 +102,26 @@ export const envSchema = z
     const razorpay = [env.RAZORPAY_KEY_ID, env.RAZORPAY_KEY_SECRET, env.RAZORPAY_WEBHOOK_SECRET].filter(Boolean).length;
     if (razorpay !== 0 && razorpay !== 3) {
       ctx.addIssue({ code: 'custom', path: ['RAZORPAY_KEY_ID'], message: 'Set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET together, or none' });
+    }
+    for (const [id, secret, name] of [
+      [env.META_APP_ID, env.META_APP_SECRET, 'META_APP_ID and META_APP_SECRET'],
+      [env.LINKEDIN_CLIENT_ID, env.LINKEDIN_CLIENT_SECRET, 'LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET'],
+      [env.YOUTUBE_CLIENT_ID, env.YOUTUBE_CLIENT_SECRET, 'YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET'],
+    ] as const) {
+      if (Boolean(id) !== Boolean(secret)) ctx.addIssue({ code: 'custom', path: [name.split(' ')[0]!], message: `Set both ${name}, or neither` });
+    }
+    const social = env.META_APP_ID || env.LINKEDIN_CLIENT_ID || env.YOUTUBE_CLIENT_ID;
+    if (social && !env.TOKEN_ENCRYPTION_KEYS) {
+      ctx.addIssue({ code: 'custom', path: ['TOKEN_ENCRYPTION_KEYS'], message: 'TOKEN_ENCRYPTION_KEYS is required when a social platform is configured' });
+    }
+    if (env.TOKEN_ENCRYPTION_KEYS) {
+      for (const entry of env.TOKEN_ENCRYPTION_KEYS.split(',')) {
+        const [kid, key] = entry.trim().split(':');
+        if (!kid || !/^[a-z0-9-]{1,16}$/i.test(kid) || !key || Buffer.from(key, 'base64').length !== 32) {
+          ctx.addIssue({ code: 'custom', path: ['TOKEN_ENCRYPTION_KEYS'], message: 'Each key must be kid:base64 of exactly 32 bytes (e.g. k1:$(openssl rand -base64 32))' });
+          break;
+        }
+      }
     }
     if (Boolean(env.GOOGLE_CLIENT_ID) !== Boolean(env.GOOGLE_CLIENT_SECRET)) {
       ctx.addIssue({ code: 'custom', path: ['GOOGLE_CLIENT_ID'], message: 'Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or neither' });

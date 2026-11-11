@@ -65,11 +65,20 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 | `segment` | organizationId, name, definition (JSON filter) (planned, P12/P14) |
 | `consent` | organizationId, contactId, channel, status, source, capturedAt (planned, P14 compliance) |
 
+## Social accounts (Phase 9)
+
+| Table | Key fields |
+|---|---|
+| `social_connection` ✅ | organizationId, provider (meta/linkedin/google), externalUserId, displayName, accessTokenEncrypted, refreshTokenEncrypted?, expiresAt, scopes[], status (ACTIVE/NEEDS_REAUTH/REVOKED), lastRefreshedAt, lastError, connectedById. Unique (organizationId, provider, externalUserId) |
+| `social_account` ✅ | organizationId, connectionId → social_connection (cascade), platform (FACEBOOK_PAGE/INSTAGRAM_BUSINESS/LINKEDIN_PAGE/YOUTUBE_CHANNEL), externalId, name, username, avatarUrl, accountTokenEncrypted? (Meta Page token), capabilities (JSON), status (ACTIVE/NEEDS_REAUTH/ERROR/DISCONNECTED), lastCheckedAt, lastError, workspaceIds[] (empty = all), connectedById. Unique (organizationId, platform, externalId) |
+| `social_webhook_event` ✅ | provider, object, objectId, field, payload (JSON), receivedAt, processedAt. Platform-level (not tenant-scoped), consumed by Phases 10 and 13 |
+
+Encrypted columns use AES-256-GCM with the row's identity as associated data (see SECURITY.md).
+
 ## Marketing, social & ads (planned)
 
 | Table | Phase | Key fields |
 |---|---|---|
-| `social_account` | P9 | organizationId, platform, externalId, name, accessTokenEncrypted, refreshTokenEncrypted, expiresAt, scopes, status |
 | `social_post` | P10 | organizationId, campaignId?, caption, mediaFileIds, status, scheduledAt, timezone |
 | `social_post_target` | P10 | postId, socialAccountId, externalPostId, status, error, publishedAt |
 | `ad_account`, `ad_campaign`, `ad_set`, `ad` | P11 | organizationId, platform ids, objective, budget, status (mirrors the platform) |

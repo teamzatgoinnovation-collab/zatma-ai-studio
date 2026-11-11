@@ -18,6 +18,12 @@ const LABELS: Record<string, string> = {
   'billing.plan_changed': 'changed the plan',
   'billing.canceled': 'canceled the subscription',
   'ai.settings_updated': 'changed AI provider preferences',
+  'social.connected': 'connected a social login',
+  'social.reconnected': 'reconnected a social login',
+  'social.accounts_added': 'added social accounts',
+  'social.account_updated': 'changed a social account’s workspaces',
+  'social.account_disconnected': 'disconnected a social account',
+  'social.reauth_required': 'was told a social account needs reconnecting',
 };
 
 /** Human-readable sentence for an audit action code (falls back to the code itself). */
