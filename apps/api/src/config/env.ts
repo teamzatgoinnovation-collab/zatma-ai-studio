@@ -89,6 +89,13 @@ export const envSchema = z
     GOOGLE_REVOKE_URL: z.url().default('https://oauth2.googleapis.com/revoke'),
     YOUTUBE_API_URL: z.url().default('https://www.googleapis.com/youtube/v3'),
     YOUTUBE_UPLOAD_URL: z.url().default('https://www.googleapis.com/upload/youtube/v3'),
+    // Phase 11: Google Ads API (Meta ads reuse META_APP_ID / META_APP_SECRET)
+    GOOGLE_ADS_CLIENT_ID: optional,
+    GOOGLE_ADS_CLIENT_SECRET: optional,
+    GOOGLE_ADS_DEVELOPER_TOKEN: optional,
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID: z.string().regex(/^\d{3}-?\d{3}-?\d{4}$/, 'Use the 10-digit manager account id').optional(),
+    GOOGLE_ADS_API_VERSION: z.string().regex(/^v\d+$/).default('v22'),
+    GOOGLE_ADS_API_URL: z.url().default('https://googleads.googleapis.com'),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.BETTER_AUTH_SECRET.startsWith('change-me')) {
@@ -108,10 +115,14 @@ export const envSchema = z
       [env.META_APP_ID, env.META_APP_SECRET, 'META_APP_ID and META_APP_SECRET'],
       [env.LINKEDIN_CLIENT_ID, env.LINKEDIN_CLIENT_SECRET, 'LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET'],
       [env.YOUTUBE_CLIENT_ID, env.YOUTUBE_CLIENT_SECRET, 'YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET'],
+      [env.GOOGLE_ADS_CLIENT_ID, env.GOOGLE_ADS_CLIENT_SECRET, 'GOOGLE_ADS_CLIENT_ID and GOOGLE_ADS_CLIENT_SECRET'],
     ] as const) {
       if (Boolean(id) !== Boolean(secret)) ctx.addIssue({ code: 'custom', path: [name.split(' ')[0]!], message: `Set both ${name}, or neither` });
     }
-    const social = env.META_APP_ID || env.LINKEDIN_CLIENT_ID || env.YOUTUBE_CLIENT_ID;
+    if (env.GOOGLE_ADS_CLIENT_ID && !env.GOOGLE_ADS_DEVELOPER_TOKEN) {
+      ctx.addIssue({ code: 'custom', path: ['GOOGLE_ADS_DEVELOPER_TOKEN'], message: 'GOOGLE_ADS_DEVELOPER_TOKEN is required with the Google Ads OAuth client' });
+    }
+    const social = env.META_APP_ID || env.LINKEDIN_CLIENT_ID || env.YOUTUBE_CLIENT_ID || env.GOOGLE_ADS_CLIENT_ID;
     if (social && !env.TOKEN_ENCRYPTION_KEYS) {
       ctx.addIssue({ code: 'custom', path: ['TOKEN_ENCRYPTION_KEYS'], message: 'TOKEN_ENCRYPTION_KEYS is required when a social platform is configured' });
     }

@@ -25,28 +25,31 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions          Session[]
-  accounts          Account[]
-  members           Member[]
-  invitations       Invitation[]
-  auditLogs         AuditLog[]
-  files             StoredFile[]
-  aiUsage           AiUsage[]
-  generationJobs    GenerationJob[]
-  designs           Design[]
-  designVersions    DesignVersion[]
-  copyAssets        CopyAsset[]
-  ownedLeads        Lead[]             @relation("LeadOwner")
-  ownedContacts     Contact[]          @relation("ContactOwner")
-  ownedCompanies    Company[]          @relation("CompanyOwner")
-  ownedDeals        Deal[]             @relation("DealOwner")
-  activities        Activity[]         @relation("ActivityOwner")
-  createdActs       Activity[]         @relation("ActivityCreator")
-  crmImports        CrmImport[]
-  socialConnections SocialConnection[]
-  socialAccounts    SocialAccount[]
-  socialPosts       SocialPost[]       @relation("PostCreator")
-  approvedPosts     SocialPost[]       @relation("PostApprover")
+  sessions           Session[]
+  accounts           Account[]
+  members            Member[]
+  invitations        Invitation[]
+  auditLogs          AuditLog[]
+  files              StoredFile[]
+  aiUsage            AiUsage[]
+  generationJobs     GenerationJob[]
+  designs            Design[]
+  designVersions     DesignVersion[]
+  copyAssets         CopyAsset[]
+  ownedLeads         Lead[]             @relation("LeadOwner")
+  ownedContacts      Contact[]          @relation("ContactOwner")
+  ownedCompanies     Company[]          @relation("CompanyOwner")
+  ownedDeals         Deal[]             @relation("DealOwner")
+  activities         Activity[]         @relation("ActivityOwner")
+  createdActs        Activity[]         @relation("ActivityCreator")
+  crmImports         CrmImport[]
+  socialConnections  SocialConnection[]
+  socialAccounts     SocialAccount[]
+  socialPosts        SocialPost[]       @relation("PostCreator")
+  approvedPosts      SocialPost[]       @relation("PostApprover")
+  adCampaigns        AdCampaign[]       @relation("AdCampaignCreator")
+  activatedCampaigns AdCampaign[]       @relation("AdCampaignActivator")
+  adApprovals        AdApproval[]
 
   @@map("user")
 }
@@ -146,6 +149,12 @@ model Organization {
   socialAccounts    SocialAccount[]
   socialPosts       SocialPost[]
   socialPostTargets SocialPostTarget[]
+  adAccounts        AdAccount[]
+  adCampaigns       AdCampaign[]
+  adGroups          AdGroup[]
+  ads               Ad[]
+  adInsights        AdInsightDaily[]
+  adApprovals       AdApproval[]
   invoices          Invoice[]
   payments          Payment[]
 
@@ -199,6 +208,7 @@ model Workspace {
   designs      Design[]
   copyAssets   CopyAsset[]
   socialPosts  SocialPost[]
+  adCampaigns  AdCampaign[]
 
   @@index([organizationId])
   @@map("workspace")
@@ -971,6 +981,7 @@ model SocialConnection {
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   connectedBy  User?           @relation(fields: [connectedById], references: [id], onDelete: SetNull)
   accounts     SocialAccount[]
+  adAccounts   AdAccount[]
 
   @@unique([organizationId, provider, externalUserId])
   @@index([organizationId])
@@ -999,9 +1010,9 @@ model SocialAccount {
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  connection   SocialConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  connectedBy  User?            @relation(fields: [connectedById], references: [id], onDelete: SetNull)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connection   SocialConnection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connectedBy  User?              @relation(fields: [connectedById], references: [id], onDelete: SetNull)
   postTargets  SocialPostTarget[]
 
   @@unique([organizationId, platform, externalId])
@@ -1101,6 +1112,180 @@ model SocialPostTarget {
   @@unique([postId, socialAccountId])
   @@index([organizationId, status, publishedAt])
   @@map("social_post_target")
+}
+
+enum AdPlatform {
+  META
+  GOOGLE
+}
+
+enum AdCampaignStatus {
+  DRAFT
+  PUBLISHING
+  PAUSED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+  ERROR
+}
+
+enum AdBudgetType {
+  DAILY
+  LIFETIME
+}
+
+/// A Meta ad account or Google Ads customer the organization can run campaigns in (Phase 11).
+model AdAccount {
+  id              String     @id @default(uuid(7))
+  organizationId  String
+  /// OAuth grant (social_connection with provider meta_ads / google_ads)
+  connectionId    String
+  platform        AdPlatform
+  externalId      String
+  name            String
+  currency        String
+  timezone        String
+  status          String     @default("ACTIVE")
+  /// Google: manager account sent as login-customer-id
+  loginCustomerId String?
+  /// Owner/Admin-set ceiling for committed spend per UTC month, in the account currency
+  monthlySpendCap Decimal?   @db.Decimal(14, 2)
+  workspaceIds    String[]   @default([])
+  lastSyncedAt    DateTime?
+  lastError       String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connection   SocialConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  campaigns    AdCampaign[]
+
+  @@unique([organizationId, platform, externalId])
+  @@map("ad_account")
+}
+
+model AdCampaign {
+  id               String           @id @default(uuid(7))
+  organizationId   String
+  workspaceId      String
+  adAccountId      String
+  platform         AdPlatform
+  name             String
+  objective        String
+  status           AdCampaignStatus @default(DRAFT)
+  source           String           @default("CREATED")
+  budgetType       AdBudgetType     @default(DAILY)
+  budgetAmount     Decimal          @db.Decimal(14, 2)
+  currency         String
+  startAt          DateTime?
+  endAt            DateTime?
+  externalId       String?
+  /// Google budget resource name (budget changes)
+  budgetExternalId String?
+  /// Resumable creation progress (ids created so far)
+  syncState        Json             @default("{}")
+  error            String?
+  createdById      String?
+  activatedById    String?
+  activatedAt      DateTime?
+  lastSyncedAt     DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  adAccount    AdAccount        @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  createdBy    User?            @relation("AdCampaignCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  activatedBy  User?            @relation("AdCampaignActivator", fields: [activatedById], references: [id], onDelete: SetNull)
+  adGroups     AdGroup[]
+  insights     AdInsightDaily[]
+  approvals    AdApproval[]
+
+  @@unique([adAccountId, externalId])
+  @@index([organizationId, status])
+  @@map("ad_campaign")
+}
+
+/// Meta ad set or Google ad group
+model AdGroup {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  campaignId     String
+  name           String
+  status         String   @default("PAUSED")
+  externalId     String?
+  targeting      Json
+  position       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     AdCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  ads          Ad[]
+
+  @@index([campaignId])
+  @@map("ad_group")
+}
+
+model Ad {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  adGroupId      String
+  name           String
+  status         String   @default("PAUSED")
+  externalId     String?
+  creative       Json
+  position       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  adGroup      AdGroup      @relation(fields: [adGroupId], references: [id], onDelete: Cascade)
+
+  @@index([adGroupId])
+  @@map("ad")
+}
+
+model AdInsightDaily {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  campaignId     String
+  date           DateTime @db.Date
+  impressions    Int      @default(0)
+  reach          Int      @default(0)
+  clicks         Int      @default(0)
+  spend          Decimal  @default(0) @db.Decimal(14, 2)
+  conversions    Int      @default(0)
+  leads          Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     AdCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, date])
+  @@index([organizationId, date])
+  @@map("ad_insight_daily")
+}
+
+/// Every decision that lets a campaign spend (activation, resume, budget increase), with the maximum shown to the approver.
+model AdApproval {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  campaignId     String
+  action         String
+  maxSpend       Decimal  @db.Decimal(14, 2)
+  currency       String
+  budgetAmount   Decimal  @db.Decimal(14, 2)
+  approvedById   String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     AdCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  approvedBy   User?        @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([campaignId])
+  @@map("ad_approval")
 }
 
 /// Verified platform webhook deliveries (Meta), kept for publishing/analytics phases. Platform-level (not tenant scoped).

@@ -16,13 +16,13 @@ presented as connected.
 | **S3-compatible storage** | Assets, exports | 1 | `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET` (moto S3 emulator in dev, Cloudflare R2 in prod; bucket CORS must allow PUT from the web origin) | Implemented (presigned upload, completion check, signed downloads) |
 | **Meta Graph API: Pages** | Facebook Page connection (P9), publishing and insights (P10) | 9–10 | Meta App (`META_APP_ID/SECRET`), Business verification, App Review: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_manage_metadata`, `business_management` | **Connection implemented** (OAuth, long-lived tokens, Page discovery, health checks, webhooks, deauthorize and data deletion). Enabled when keys are set; real accounts need App Review. **Publishing implemented (P10)**: feed text, photo, multi-photo, video |
 | **Meta Graph API: Instagram** | IG Business/Creator connection (P9) and publishing (P10) | 9–10 | `instagram_basic`, `instagram_content_publish`, IG account linked to a Page | **Connection and publishing implemented** (single image, carousel, Reels via the Content Publishing API) |
-| **Meta Marketing API** | Ad accounts, campaigns, insights | 11 | `ads_management`, `ads_read`, `business_management`, Advanced Access | Pending |
+| **Meta Marketing API** | Ad accounts, campaigns, ad sets, ads, lead forms, insights | 11 | Same Meta app; `ads_management`, `ads_read`, `business_management`, `pages_manage_ads`, Advanced Access + App Review | **Implemented** (paused creation, approved activation, insights, import). Enabled when Meta keys are set |
 | **Meta Lead Ads** | Lead capture into CRM | 13 | `leads_retrieval`, webhook subscription (`leadgen`) | Pending |
 | **WhatsApp Business Platform (Cloud API)** | Messaging, templates | 14 | WABA, verified phone number, permanent system-user token, template approvals | Pending |
 | **LinkedIn** | Company Page connection (P9), posts (P10), ads (P11) | 9–11 | LinkedIn app (`LINKEDIN_CLIENT_ID/SECRET`) with **Community Management API** access | **Connection and publishing implemented** (Posts API with text, images, multi-image and video) |
 | **TikTok** | Video posting, ads | 10–11 | Content Posting API audit, TikTok for Business API | Pending |
 | **YouTube Data API** | Channel connection (P9), video uploads (P10) | 9–10 | Separate Google OAuth client (`YOUTUBE_CLIENT_ID/SECRET`) with `youtube.readonly` + `youtube.upload`, consent-screen verification, quota | **Connection and upload implemented** (resumable upload of one video per post) |
-| **Google Ads API** | Search/display/video campaigns, leads | 11 | Developer token (Basic access), OAuth, MCC | Pending |
+| **Google Ads API** | Search campaigns (responsive search ads), insights | 11 | `GOOGLE_ADS_CLIENT_ID/SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN` (Basic access), optional MCC `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | **Implemented** (Search only; Display/Video/Performance Max later). Enabled when keys are set |
 | **Pinterest API** | Pins | 10 | Pinterest app, standard access | Pending |
 | **Resend** | Transactional email (verification, reset, invitations, billing) | 2 | `RESEND_API_KEY`, `EMAIL_FROM`, verified sending domain (SPF/DKIM/DMARC on zatgoinnovation.com) | **Implemented**; dev uses the capture inbox (`/api/v1/dev/emails`) |
 | **Marketing email provider** | Bulk campaigns | 14 | TBD (Resend Broadcasts / Amazon SES) | Pending |
@@ -134,3 +134,46 @@ A post is never shown as published until the platform returns a post id.
 * Meta App Review must cover `pages_manage_posts` and `instagram_content_publish`; LinkedIn needs `w_organization_social`.
 
 **Verification without keys:** the stand-in server used in Phase 9 also implements these endpoints and checks `appsecret_proof`, upload sizes, ETags, `LinkedIn-Version` headers and resumable `Content-Range` handling.
+
+## Ads (Phase 11)
+
+**Spending is never automatic:**
+* Every campaign, ad set, ad group and ad is created **PAUSED**.
+* Only a person with `ads:approve` (Owner/Admin) can activate a campaign or raise a running budget. They confirm the maximum possible spend in a dialog, and the server recomputes and rejects it if the figure is higher.
+* An optional monthly **spend cap** per ad account blocks activation above it.
+* Background jobs only read (insights, imports, status mirroring); they never activate or raise budgets.
+
+### Meta Marketing API
+1. Use the same Meta app as Phase 9 (`META_APP_ID` / `META_APP_SECRET`). Add the **Marketing API** product, and add `{API_URL}/api/v1/ads/oauth/meta_ads/callback` to the Valid OAuth Redirect URIs.
+2. Request App Review for `ads_management`, `ads_read`, `business_management` and `pages_manage_ads` (lead forms and Page creatives). Apply for **Advanced Access** to the Ads Management Standard Access tier, and complete Business Verification.
+3. **Endpoints used** (Graph `META_GRAPH_VERSION`, every call with `appsecret_proof`):
+   * Accounts: `GET /me/adaccounts`.
+   * Creation: `POST /act_{id}/adimages` (bytes), `/act_{id}/campaigns` (`status=PAUSED`, CBO `daily_budget` / `lifetime_budget` in minor units), `/act_{id}/adsets` (targeting, optimisation goal by objective), `/{page}/leadgen_forms` (with the Page token), `/act_{id}/adcreatives`, `/act_{id}/ads` (`status=PAUSED`).
+   * Status and budget: `POST /{id}` `status` / budget.
+   * Data: `GET /act_{id}/insights` (`level=campaign`, `time_increment=1`); `GET /search?type=adgeolocation|adinterest|adlocale`.
+4. **Objective mapping:**
+
+   | Objective | Meta objective | Optimisation goal |
+   |---|---|---|
+   | Traffic | OUTCOME_TRAFFIC | LINK_CLICKS |
+   | Engagement | OUTCOME_ENGAGEMENT | POST_ENGAGEMENT |
+   | Messages | OUTCOME_ENGAGEMENT | CONVERSATIONS (WHATSAPP / MESSENGER destination) |
+   | Awareness | OUTCOME_AWARENESS | REACH |
+   | Leads | OUTCOME_LEADS | LEAD_GENERATION (ON_AD instant form) |
+
+5. **Activation order:** ads, then ad sets, then the campaign last, so spending can only begin at the final call.
+6. Budgets below the account currency's minimum are rejected by Meta, and the message (e.g. "Budget too low…") is shown as returned.
+
+### Google Ads API
+1. In a Google Cloud project, enable the **Google Ads API** and create an OAuth client (Web), separate from sign-in and YouTube. Add the redirect URI `{API_URL}/api/v1/ads/oauth/google_ads/callback`. Scope: `https://www.googleapis.com/auth/adwords` (sensitive, so the consent screen must be verified).
+2. Apply for a **developer token** in the Google Ads manager (MCC) account's API Center. Test access works only with test accounts; **Basic access** is needed for real accounts. Set `GOOGLE_ADS_DEVELOPER_TOKEN` as a server secret: it is sent only as the `developer-token` header and is never returned to clients.
+3. Optional: set `GOOGLE_ADS_LOGIN_CUSTOMER_ID` to the manager account. Client accounts discovered under a manager use that manager's id automatically.
+4. Set `GOOGLE_ADS_API_VERSION` (default `v22`). Google supports each version for about 12 months; bump it as versions sunset.
+5. **Endpoints used:**
+   * Discovery: `customers:listAccessibleCustomers`; `customers/{id}/googleAds:search` (GAQL for customer and customer_client, campaigns, daily metrics with `segments.date`, language constants); `geoTargetConstants:suggest`.
+   * Creation: `customers/{id}/googleAds:mutate`, called first with `validateOnly: true` and then for real, atomically (`partialFailure: false`) with temporary resource ids: budget, campaign (`SEARCH`, `PAUSED`, Maximize clicks), location and language criteria, ad group, keywords, responsive search ad.
+   * Changes: activation is `campaignOperation.update` to `status=ENABLED`; budget changes are `campaignBudgetOperation.update` of `amount_micros`.
+6. Money is converted exactly: amounts are stored as decimals, Meta uses minor units (zero-decimal currencies such as JPY are handled), and Google uses micros.
+
+### Verification without keys
+The local stand-in implements these Marketing API and Google Ads endpoints. It refuses any campaign, ad set or ad that is not created PAUSED, enforces the developer-token header, and returns daily insights. The base URLs are overridable (`META_GRAPH_URL`, `GOOGLE_ADS_API_URL`); never override them in production.

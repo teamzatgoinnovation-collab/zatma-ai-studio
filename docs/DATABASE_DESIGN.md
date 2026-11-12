@@ -76,6 +76,19 @@ Status legend: ✅ implemented · 🕓 planned (phase)
 | `social_post` ✅ (P10) | organizationId, workspaceId, caption, hashtags[], media (JSON: file id, kind, type, size, dimensions, duration, alt text), status, scheduledAt, timezone, publishedAt, sourceDesignId?, copyAssetId?, campaignId? (P12), createdById, submittedAt, approvedById/At, reviewNote, revision, deletedAt |
 | `social_post_target` ✅ (P10) | organizationId, postId (cascade), socialAccountId? (set null on disconnect), platform, accountName (snapshot), captionOverride, options (JSON), status, attempts, providerState (JSON resumable progress), externalId, externalUrl, error, errorCode, lastAttemptAt, nextAttemptAt, publishedAt. Unique (postId, socialAccountId) |
 
+## Ads (Phase 11)
+
+| Table | Key fields |
+|---|---|
+| `ad_account` ✅ | organizationId, connectionId → social_connection (provider meta_ads / google_ads), platform (META / GOOGLE), externalId (`act_…` / customer id), name, currency, timezone, status, loginCustomerId?, **monthlySpendCap?** Decimal(14,2), workspaceIds[], lastSyncedAt, lastError. Unique (org, platform, externalId) |
+| `ad_campaign` ✅ | organizationId, workspaceId, adAccountId, platform, name, objective, status (DRAFT / PUBLISHING / PAUSED / ACTIVE / COMPLETED / ARCHIVED / ERROR), source (CREATED / IMPORTED), budgetType, budgetAmount Decimal, currency, startAt, endAt, externalId, budgetExternalId, syncState (JSON resumable creation), error, createdById, activatedById / activatedAt, lastSyncedAt, deletedAt |
+| `ad_group` ✅ | Meta ad set / Google ad group: campaignId, name, status, externalId, targeting (JSON), position |
+| `ad` ✅ | adGroupId, name, status, externalId, creative (JSON: Meta image, text, CTA, link, messaging, lead form; or Google RSA), position |
+| `ad_insight_daily` ✅ | campaignId, date, impressions, reach, clicks, spend Decimal, conversions, leads. Unique (campaign, date) |
+| `ad_approval` ✅ | campaignId, action (ACTIVATE / BUDGET_INCREASE), maxSpend, currency, budgetAmount, approvedById, createdAt |
+
+Plan limits gained `adAccounts` (Free 0, Starter 1, Professional 3, Business 10, Agency unlimited).
+
 `organization.socialSettings` (JSON) holds `{ requireApproval }`. Plan limits gained `postsPerMonth` (Free 10, Starter 60, Professional 300, Business 1,500, Agency unlimited).
 
 Encrypted columns use AES-256-GCM with the row's identity as associated data (see SECURITY.md).
@@ -84,7 +97,6 @@ Encrypted columns use AES-256-GCM with the row's identity as associated data (se
 
 | Table | Phase | Key fields |
 |---|---|---|
-| `ad_account`, `ad_campaign`, `ad_set`, `ad` | P11 | organizationId, platform ids, objective, budget, status (mirrors the platform) |
 | `campaign` | P12 | organizationId, name, type, objective, audience, startAt, endAt, budget, status, ownerId |
 | `automation`, `automation_node`, `automation_run`, `automation_run_step` | P13 | graph JSON, trigger, run logs |
 | `email_template`, `email_campaign`, `email_event` | P14 | |

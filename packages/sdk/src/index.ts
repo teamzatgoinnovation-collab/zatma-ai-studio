@@ -24,6 +24,14 @@ import type {
   Workspace,
 } from '@zatma/types';
 import type {
+  AdAccountDto,
+  AdCampaignDto,
+  AdInsights,
+  AdIssue,
+  AiCampaignRequest,
+  AvailableAdAccount,
+  CampaignDraftRequest,
+  TargetingOption,
   AddSocialAccountsInput,
   AvailableSocialAccount,
   CalendarEntry,
@@ -330,6 +338,33 @@ export function createApiClient(options: ApiClientOptions) {
         publishNow: (postId: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/publish`, { confirm: true }),
         cancel: (postId: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/cancel`),
         retry: (postId: string, targetId: string) => request<SocialPostDto>('POST', `/social/posts/${id(postId)}/targets/${id(targetId)}/retry`),
+      },
+    },
+    ads: {
+      providers: () => request<Array<{ id: 'meta_ads' | 'google_ads'; platform: 'META' | 'GOOGLE'; name: string; configured: boolean; unavailableReason: string | null; scopes: string[]; redirectUri: string }>>('GET', '/ads/providers'),
+      connect: (provider: 'meta_ads' | 'google_ads', returnTo?: string) => request<{ authorizeUrl: string }>('POST', `/ads/connect/${id(provider)}`, returnTo ? { returnTo } : {}),
+      available: (connectionId: string) => request<AvailableAdAccount[]>('GET', `/ads/connections/${id(connectionId)}/available`),
+      accounts: (platform?: 'META' | 'GOOGLE') => request<AdAccountDto[]>('GET', '/ads/accounts', undefined, platform ? { platform } : undefined),
+      addAccounts: (input: { connectionId: string; externalIds: string[]; workspaceIds?: string[] }) => request<AdAccountDto[]>('POST', '/ads/accounts', input),
+      updateAccount: (accountId: string, input: { workspaceIds?: string[]; monthlySpendCap?: string | null }) => request<AdAccountDto>('PATCH', `/ads/accounts/${id(accountId)}`, input),
+      removeAccount: (accountId: string) => request<void>('DELETE', `/ads/accounts/${id(accountId)}`),
+      sync: (accountId: string) => request<{ queued: true }>('POST', `/ads/accounts/${id(accountId)}/sync`),
+      targeting: (accountId: string, kind: 'location' | 'interest' | 'language', q: string) => request<TargetingOption[]>('GET', `/ads/accounts/${id(accountId)}/targeting`, undefined, { kind, q }),
+      campaigns: {
+        list: (query?: { platform?: string; status?: string; adAccountId?: string; q?: string; page?: number; pageSize?: number }) => request<Paginated<AdCampaignDto>>('GET', '/ads/campaigns', undefined, query),
+        get: (campaignId: string) => request<AdCampaignDto>('GET', `/ads/campaigns/${id(campaignId)}`),
+        validate: (input: CampaignDraftRequest) => request<{ issues: AdIssue[]; maxSpend: AdCampaignDto['maxSpend'] }>('POST', '/ads/campaigns/validate', input),
+        aiDraft: (input: Partial<AiCampaignRequest> & Pick<AiCampaignRequest, 'adAccountId' | 'brief'>) => request<{ draft: Omit<CampaignDraftRequest, 'workspaceId'>; rationale: string; unresolved: string[] }>('POST', '/ads/campaigns/ai-draft', input),
+        create: (input: CampaignDraftRequest) => request<AdCampaignDto>('POST', '/ads/campaigns', input),
+        update: (campaignId: string, input: Partial<Omit<CampaignDraftRequest, 'workspaceId' | 'adAccountId'>>) => request<AdCampaignDto>('PATCH', `/ads/campaigns/${id(campaignId)}`, input),
+        remove: (campaignId: string) => request<void>('DELETE', `/ads/campaigns/${id(campaignId)}`),
+        /** Creates the campaign on the platform, PAUSED. */
+        publish: (campaignId: string) => request<AdCampaignDto>('POST', `/ads/campaigns/${id(campaignId)}/publish`),
+        pause: (campaignId: string) => request<AdCampaignDto>('POST', `/ads/campaigns/${id(campaignId)}/pause`),
+        /** Starts spending. Only call after the approver confirmed `maxSpend` in the UI. */
+        activate: (campaignId: string, maxSpend: string) => request<AdCampaignDto>('POST', `/ads/campaigns/${id(campaignId)}/activate`, { confirm: true, maxSpend }),
+        budget: (campaignId: string, input: { budgetAmount: string; confirm?: true; maxSpend?: string }) => request<AdCampaignDto>('POST', `/ads/campaigns/${id(campaignId)}/budget`, input),
+        insights: (campaignId: string, from: string, to: string) => request<AdInsights>('GET', `/ads/campaigns/${id(campaignId)}/insights`, undefined, { from, to }),
       },
     },
     copyAssets: {

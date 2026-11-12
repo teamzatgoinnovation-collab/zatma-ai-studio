@@ -185,7 +185,7 @@ export type ChangePlanInput = z.infer<typeof changePlanSchema>;
 
 // ── Phase 4: AI ──
 export const AI_PROVIDER_IDS = ['anthropic', 'openai', 'gemini'] as const;
-export const AI_PURPOSES = ['playground', 'copywriter', 'design', 'crm', 'assistant'] as const;
+export const AI_PURPOSES = ['playground', 'copywriter', 'design', 'crm', 'ads', 'assistant'] as const;
 
 export const generateTextSchema = z
   .object({
@@ -232,3 +232,4 @@ export * from './scoring.js';
 export * from './social.js';
 export * from './publishing.js';
 export { withoutDefaults } from './patch.js';
+export * from './ads.js';

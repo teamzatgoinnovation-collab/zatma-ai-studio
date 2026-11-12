@@ -39,6 +39,8 @@ export const PERMISSIONS = [
   'social:connect',
   'ads:read',
   'ads:manage',
+  /** Start spending: activate, resume or raise budgets (Owner/Admin). */
+  'ads:approve',
   'analytics:read',
   'automation:read',
   'automation:write',

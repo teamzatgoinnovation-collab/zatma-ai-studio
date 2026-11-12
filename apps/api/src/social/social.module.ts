@@ -8,6 +8,6 @@ import { SocialService } from './social.service.js';
   imports: [BullModule.registerQueue({ name: SOCIAL_HEALTH_QUEUE })],
   controllers: [SocialController, SocialOAuthController, MetaCallbacksController],
   providers: [SocialProviderRegistry, OAuthStateStore, SocialService, SocialHealthScheduler, SocialHealthProcessor],
-  exports: [SocialService, SocialProviderRegistry],
+  exports: [SocialService, SocialProviderRegistry, OAuthStateStore],
 })
 export class SocialModule {}

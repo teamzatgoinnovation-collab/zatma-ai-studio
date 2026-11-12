@@ -8,14 +8,14 @@ const PLANS: Array<{
   description: string;
   priceMonthly: string | null;
   priceYearly: string | null;
-  limits: { aiCredits: number; storageMb: number; members: number; socialAccounts: number; workspaces: number; crmRecords: number; postsPerMonth: number };
+  limits: { aiCredits: number; storageMb: number; members: number; socialAccounts: number; workspaces: number; crmRecords: number; postsPerMonth: number; adAccounts: number };
   isPublic: boolean;
 }> = [
-  { code: 'FREE', name: 'Free', description: 'Limited AI usage and basic CRM', priceMonthly: '0', priceYearly: '0', limits: { aiCredits: 20, storageMb: 500, members: 1, socialAccounts: 1, workspaces: 1, crmRecords: 500, postsPerMonth: 10 }, isPublic: true },
-  { code: 'STARTER', name: 'Starter', description: '100 AI designs, CRM, basic publishing', priceMonthly: '499', priceYearly: '4990', limits: { aiCredits: 100, storageMb: 5_000, members: 3, socialAccounts: 3, workspaces: 2, crmRecords: 5_000, postsPerMonth: 60 }, isPublic: true },
-  { code: 'PROFESSIONAL', name: 'Professional', description: '500 AI designs, scheduling, campaigns and automation', priceMonthly: '1499', priceYearly: '14990', limits: { aiCredits: 500, storageMb: 20_000, members: 10, socialAccounts: 10, workspaces: 5, crmRecords: 25_000, postsPerMonth: 300 }, isPublic: true },
-  { code: 'BUSINESS', name: 'Business', description: 'Multi-brand, advanced CRM, team collaboration', priceMonthly: '3999', priceYearly: '39990', limits: { aiCredits: 2_000, storageMb: 100_000, members: 25, socialAccounts: 30, workspaces: 15, crmRecords: 100_000, postsPerMonth: 1_500 }, isPublic: true },
-  { code: 'AGENCY', name: 'Agency', description: 'Multiple clients, team management, white-label options', priceMonthly: null, priceYearly: null, limits: { aiCredits: -1, storageMb: -1, members: -1, socialAccounts: -1, workspaces: -1, crmRecords: -1, postsPerMonth: -1 }, isPublic: true },
+  { code: 'FREE', name: 'Free', description: 'Limited AI usage and basic CRM', priceMonthly: '0', priceYearly: '0', limits: { aiCredits: 20, storageMb: 500, members: 1, socialAccounts: 1, workspaces: 1, crmRecords: 500, postsPerMonth: 10, adAccounts: 0 }, isPublic: true },
+  { code: 'STARTER', name: 'Starter', description: '100 AI designs, CRM, basic publishing', priceMonthly: '499', priceYearly: '4990', limits: { aiCredits: 100, storageMb: 5_000, members: 3, socialAccounts: 3, workspaces: 2, crmRecords: 5_000, postsPerMonth: 60, adAccounts: 1 }, isPublic: true },
+  { code: 'PROFESSIONAL', name: 'Professional', description: '500 AI designs, scheduling, campaigns and automation', priceMonthly: '1499', priceYearly: '14990', limits: { aiCredits: 500, storageMb: 20_000, members: 10, socialAccounts: 10, workspaces: 5, crmRecords: 25_000, postsPerMonth: 300, adAccounts: 3 }, isPublic: true },
+  { code: 'BUSINESS', name: 'Business', description: 'Multi-brand, advanced CRM, team collaboration', priceMonthly: '3999', priceYearly: '39990', limits: { aiCredits: 2_000, storageMb: 100_000, members: 25, socialAccounts: 30, workspaces: 15, crmRecords: 100_000, postsPerMonth: 1_500, adAccounts: 10 }, isPublic: true },
+  { code: 'AGENCY', name: 'Agency', description: 'Multiple clients, team management, white-label options', priceMonthly: null, priceYearly: null, limits: { aiCredits: -1, storageMb: -1, members: -1, socialAccounts: -1, workspaces: -1, crmRecords: -1, postsPerMonth: -1, adAccounts: -1 }, isPublic: true },
 ];
 
 export async function seedPlans(prisma: PrismaClient): Promise<void> {
