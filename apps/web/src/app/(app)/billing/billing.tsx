@@ -18,6 +18,7 @@ const METRIC_LABELS: Record<UsageMetric, { label: string; unit?: string }> = {
   socialAccounts: { label: 'Connected social accounts' },
   crmRecords: { label: 'CRM contacts and leads' },
   postsPerMonth: { label: 'Social posts this month' },
+  adAccounts: { label: 'Connected ad accounts' },
 };
 
 const FEATURES: Record<PlanSummary['code'], string[]> = {

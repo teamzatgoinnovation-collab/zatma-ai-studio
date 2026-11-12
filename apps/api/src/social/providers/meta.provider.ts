@@ -35,12 +35,13 @@ export class MetaProvider implements SocialProvider {
   readonly id = 'meta' as const;
   readonly name = 'Facebook & Instagram';
   readonly platforms: SocialPlatform[] = ['FACEBOOK_PAGE', 'INSTAGRAM_BUSINESS'];
-  readonly scopes = META_SCOPES;
   readonly usesPkce = false;
 
   constructor(
     private readonly cfg: MetaConfig,
     private readonly fetchImpl: FetchLike = fetch,
+    /** Permissions requested at login (the ads connection asks for the Marketing API scopes). */
+    readonly scopes: string[] = META_SCOPES,
   ) {}
 
   private graph(path: string, params: Record<string, string>, token?: string): string {

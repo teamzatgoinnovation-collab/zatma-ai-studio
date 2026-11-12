@@ -59,6 +59,8 @@ export interface PlanLimits {
   crmRecords: number;
   /** Social posts published or scheduled per account per UTC calendar month (Phase 10). */
   postsPerMonth: number;
+  /** Connected ad accounts (Meta + Google Ads, Phase 11). */
+  adAccounts: number;
 }
 
 export interface PlanSummary {

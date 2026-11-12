@@ -59,6 +59,25 @@ export const emailTemplates = {
     };
   },
 
+  adSpendApproved(input: { name: string; campaign: string; platform: string; amount: string; by: string; action: 'ACTIVATE' | 'BUDGET_INCREASE'; url: string }): Template {
+    const what = input.action === 'ACTIVATE' ? 'activated' : 'raised the budget of';
+    return {
+      tag: 'ad-spend-approved',
+      subject: `${input.campaign} can now spend up to ${input.amount}`,
+      ...layout({
+        preheader: `${input.by} ${what} an ad campaign on ${input.platform}.`,
+        heading: 'Ad spend approved',
+        paragraphs: [
+          `Hi ${input.name}, ${input.by} ${what} “${input.campaign}” on ${input.platform}.`,
+          `It can now spend up to ${input.amount} under its current budget and schedule.`,
+          'You can pause it at any time from the campaign page.',
+        ],
+        action: { label: 'Open campaign', url: input.url },
+        footnote: 'You are receiving this because you are an Owner or Admin of this organization.',
+      }),
+    };
+  },
+
   postReviewed(input: { name: string; approved: boolean; reviewer: string; note: string | null; preview: string; url: string }): Template {
     return {
       tag: input.approved ? 'post-approved' : 'post-rejected',

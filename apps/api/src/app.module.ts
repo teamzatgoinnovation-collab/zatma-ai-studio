@@ -16,6 +16,7 @@ import { CopyModule } from './copy/copy.module.js';
 import { CrmModule } from './crm/crm.module.js';
 import { SocialModule } from './social/social.module.js';
 import { PublishingModule } from './publishing/publishing.module.js';
+import { AdsModule } from './ads/ads.module.js';
 import { DesignModule } from './design/design.module.js';
 import { DevModule } from './dev/dev.module.js';
 import { EmailModule } from './email/email.module.js';
@@ -72,6 +73,7 @@ const bootEnv = loadEnv();
     CrmModule,
     SocialModule,
     PublishingModule,
+    AdsModule,
     ...(bootEnv.NODE_ENV === 'production' ? [] : [DevModule]),
   ],
   providers: [
