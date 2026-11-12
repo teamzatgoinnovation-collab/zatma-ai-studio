@@ -688,7 +688,7 @@ function CopyPicker({ open, onClose, onPick }: { open: boolean; onClose: () => v
   );
 }
 
-function DesignPicker({ open, workspaceId, onClose, onPick }: { open: boolean; workspaceId: string; onClose: () => void; onPick: (id: string) => void }) {
+export function DesignPicker({ open, workspaceId, onClose, onPick }: { open: boolean; workspaceId: string; onClose: () => void; onPick: (id: string) => void }) {
   const list = useQuery({ queryKey: ['designs', 'picker', workspaceId], queryFn: () => api.designs.list({ pageSize: 24, workspaceId: workspaceId || undefined }), enabled: open });
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>

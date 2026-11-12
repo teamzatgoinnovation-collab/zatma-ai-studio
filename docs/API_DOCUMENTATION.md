@@ -300,3 +300,29 @@ Statuses:
 Error codes: `POST_INVALID` (422, with per-target issues), `NO_TARGETS`, `ACCOUNT_NOT_IN_WORKSPACE`, `MEDIA_NOT_FOUND`, `ACCOUNT_NEEDS_ATTENTION` (409), `APPROVAL_REQUIRED` (409), `POST_LOCKED` (409), `INVALID_STATUS` (409), `SCHEDULE_IN_PAST`, `SCHEDULE_TOO_FAR`, `PLAN_LIMIT_REACHED` (402, metric `postsPerMonth`).
 
 Uploads: `POST /storage/uploads` accepts `purpose: POST_MEDIA` for JPEG, PNG, WebP (up to 20 MB) and MP4 or MOV (up to 250 MB).
+
+## Phase 11 endpoints
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/ads/providers` | `ads:read` | Meta Ads / Google Ads: `configured`, `unavailableReason`, scopes, redirect URI |
+| POST | `/ads/connect/:provider` | `ads:manage` | `meta_ads` or `google_ads` → `{ authorizeUrl }` (single-use state, PKCE for Google) |
+| GET | `/ads/oauth/:provider/callback` | public, session checked | Stores the encrypted grant and redirects to `/ads/meta` or `/ads/google` with `?connection=` or `?error=` |
+| GET | `/ads/connections/:id/available` | `ads:manage` | Ad accounts the grant can use (Google client accounts under a manager included) |
+| GET / POST | `/ads/accounts[?platform=]` | read / `ads:manage` | List (with `spentThisMonth`, `committedThisMonth`, `monthlySpendCap`) / add `{ connectionId, externalIds[], workspaceIds? }` (plan limit `adAccounts`, 402) |
+| PATCH | `/ads/accounts/:id` | `ads:manage` (+ `ads:approve` for the cap) | `{ workspaceIds?, monthlySpendCap? }` |
+| DELETE | `/ads/accounts/:id` | `ads:manage` | Removes the account from ZatGo (409 `ACTIVE_CAMPAIGNS` while something is spending) |
+| POST | `/ads/accounts/:id/sync` | `ads:manage` | Queue an import, status and insights refresh (30 days) |
+| GET | `/ads/accounts/:id/targeting?kind=location\|interest\|language&q=` | `ads:manage` | Platform search returning real ids |
+| GET | `/ads/campaigns?platform&status&adAccountId&q` | `ads:read` | Paginated campaigns with `maxSpend`, `spend`, structure and approvals |
+| POST | `/ads/campaigns/validate` | `ads:manage` | Dry run: `{ issues[], maxSpend }` |
+| POST | `/ads/campaigns/ai-draft` | `ads:manage` + `ai:generate` | `{ adAccountId, brief, objective?, location?, language?, budgetMax?, link? }` → `{ draft, rationale, unresolved[] }`. **Nothing is saved.** Metered as AI purpose `ads` |
+| POST | `/ads/campaigns` | `ads:manage` | Create a draft `{ workspaceId, adAccountId, name, objective, budgetType, budgetAmount, startAt?, endAt?, adGroups: [{ name, targeting, ads: [{ name, creative }] }] }` |
+| GET / PATCH / DELETE | `/ads/campaigns/:id` | read / `ads:manage` | Edit only before creation on the platform (409 `CAMPAIGN_LOCKED` after). Delete removes it from ZatGo only (409 while active) |
+| POST | `/ads/campaigns/:id/publish` | `ads:manage` | Create on the platform through the queue; **always PAUSED** |
+| POST | `/ads/campaigns/:id/pause` | `ads:manage` | Stop spending |
+| POST | `/ads/campaigns/:id/activate` | `ads:approve` | `{ confirm: true, maxSpend }`. Errors: 409 `SPEND_CHANGED` (with the current figure), 409 `SPEND_CAP_EXCEEDED`, 409 `INVALID_STATUS` |
+| POST | `/ads/campaigns/:id/budget` | `ads:manage` (+ `ads:approve`, `confirm`, `maxSpend` to raise an active campaign) | `{ budgetAmount, confirm?, maxSpend? }` |
+| GET | `/ads/campaigns/:id/insights?from=YYYY-MM-DD&to=YYYY-MM-DD` | `ads:read` | `{ currency, totals: { impressions, reach, clicks, spend, leads, conversions, ctr, cpc, cpm }, daily[] }` |
+
+Other errors: `ADS_PROVIDER_NOT_CONFIGURED` (503), `ADS_REAUTH_REQUIRED` (409), `ADS_PROVIDER_ERROR` (502), `CAMPAIGN_INVALID` (422, with issues), `PAGE_NOT_CONNECTED`, `ACCOUNT_NOT_IN_WORKSPACE`, `SPEND_APPROVAL_REQUIRED` (403).

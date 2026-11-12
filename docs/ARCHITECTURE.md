@@ -231,3 +231,11 @@ The flow is `PublishingService` (API) → `social-publish` queue → `Publishing
 5. **Sweeper** (every minute): re-queues overdue scheduled posts and stuck targets, and settles finished posts.
 
 On the web, the composer validates live with the shared `validatePost` (`packages/validation/src/publishing.ts`), the same rules the API enforces.
+
+## Ads (Phase 11)
+
+* **Request path:** `AdsService` and `AdsAccountsService` (API) → `ads-sync` queue → `AdsWorkerService`.
+* **Adapters:** `apps/api/src/ads/providers/`, Meta Marketing API and Google Ads REST behind one `AdsPlatformAdapter` interface.
+* **Creation:** jobs call `createCampaign` (always PAUSED) and save each created id to `syncState`, so retries resume.
+* **Spend decisions:** `activate` and `changeBudget` run only in request handlers with `ads:approve`, a confirmed `maxSpend` (recomputed by the server) and the cap check. They write `ad_approval`, audit and email.
+* **Sync:** hourly (3 days) and nightly (30 days). It imports external campaigns, mirrors platform status, and upserts `ad_insight_daily`. It never activates.

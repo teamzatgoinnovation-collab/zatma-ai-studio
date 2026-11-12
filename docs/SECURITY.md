@@ -123,7 +123,16 @@
 * Only owners hold `billing:manage`. Key secrets never leave the API; the browser receives only the public key id.
 
 ## Advertising & messaging safety
-* No ad spend happens without explicit confirmation showing the account, objective and budget (Phase 11).
+* **Ads (Phase 11): no spend without an explicit, authorised decision.**
+  * Everything is created PAUSED on Meta and Google.
+  * Activation and budget increases on running campaigns need the `ads:approve` permission (Owner/Admin only) and `{ confirm: true, maxSpend }`. The server recomputes the maximum (lifetime budget, or daily budget × remaining days) and rejects it with 409 `SPEND_CHANGED` when its figure is higher than the one the approver saw.
+  * Spend cap per ad account (set by Owner/Admin): the month's recorded spend, plus the remaining maximum of other active campaigns, plus the new maximum this month, must stay under the cap, or the request gets 409 `SPEND_CAP_EXCEEDED`.
+  * Every decision is stored in `ad_approval` and audited, and the other Owners/Admins are emailed.
+  * Pausing (which stops spend) is allowed for `ads:manage`.
+  * The `ads-sync` jobs only read and mirror platform state. No code path in a job calls activation or budget changes, which the e2e tests assert on the adapter call log.
+  * The UI also asks the approver to type the campaign name.
+* **Ad platform credentials:** grants are stored with the same AES-256-GCM token encryption as social accounts. The Google Ads developer token is a server-side secret sent only as a request header.
+* **AI-planned audiences** are resolved through the platforms' own search APIs; ids suggested by the model are never used. AI output is a draft only; it is never saved or published automatically.
 * WhatsApp and email require recorded opt-in consent, and opt-out is honoured immediately (Phase 14).
 
 ## Operations (Phase 21)

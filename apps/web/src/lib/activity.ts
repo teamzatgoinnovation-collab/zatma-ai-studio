@@ -37,6 +37,22 @@ const LABELS: Record<string, string> = {
   'social.post_retried': 'retried a failed post',
   'social.post_deleted': 'deleted a post',
   'social.settings_updated': 'changed publishing approvals',
+  'ads.connected': 'connected an ad platform',
+  'ads.accounts_added': 'added ad accounts',
+  'ads.account_removed': 'removed an ad account',
+  'ads.spend_cap_changed': 'changed an ad spend cap',
+  'ads.campaign_created': 'created an ad campaign draft',
+  'ads.campaign_published_paused': 'sent an ad campaign to the platform (paused)',
+  'ads.campaign_created_paused': 'had an ad campaign created (paused)',
+  'ads.campaign_failed': 'had an ad campaign fail to create',
+  'ads.campaign_activated': 'activated an ad campaign (spending approved)',
+  'ads.activation_requested': 'requested ad campaign activation',
+  'ads.budget_increased': 'raised an ad budget (approved)',
+  'ads.budget_changed': 'changed an ad budget',
+  'ads.campaign_paused': 'paused an ad campaign',
+  'ads.campaign_deleted': 'deleted an ad campaign',
+  'ads.status_changed_on_platform': 'saw an ad campaign change on the platform',
+  'ads.reauth_required': 'was told an ad connection needs reconnecting',
 };
 
 /** Human-readable sentence for an audit action code (falls back to the code itself). */

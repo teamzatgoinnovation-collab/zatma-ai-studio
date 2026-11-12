@@ -12,8 +12,8 @@
 | 7 | CRM core | ✅ Completed |
 | 8 | AI lead scoring & intelligence | ✅ Completed |
 | 9 | Social media account integration | ✅ Completed (real accounts need app keys) |
-| 10 | Social publishing & content calendar | ✅ Completed (awaiting approval for Phase 11; live posting needs platform keys and App Review) |
-| 11 | Meta Ads manager | ⏳ Pending |
+| 10 | Social publishing & content calendar | ✅ Completed (live posting needs platform keys and App Review) |
+| 11 | Ads manager (Meta + Google Ads) | ✅ Completed (awaiting approval for Phase 12; live use needs Marketing API access and a Google Ads developer token) |
 | 12 | Campaign management | ⏳ Pending |
 | 13 | Marketing automation | ⏳ Pending |
 | 14 | Email & WhatsApp marketing | ⏳ Pending |
@@ -850,3 +850,126 @@ See `API_DOCUMENTATION.md` → Phase 10 endpoints. New env `YOUTUBE_UPLOAD_URL` 
 
 ### Next phase
 **Phase 11: Meta Ads manager.** Ad account connection, an AI campaign builder (objective, audience, budget, creative from designs and copy), and campaign, ad set and ad management with insights. **Nothing will spend money without explicit approval.**
+
+## Phase 11: Ads manager, Meta + Google Ads (✅ Completed; platform access pending)
+
+### Features implemented
+* **Connections:**
+  * Meta Ads, through the same Meta app with Marketing API scopes.
+  * Google Ads, through its own OAuth client with PKCE, offline access and a developer token; client accounts under a manager (MCC) are found automatically.
+  * Choose ad accounts, assign workspaces, refresh, and remove.
+  * New plan limit `adAccounts`.
+* **Campaign builder** (`/ads/campaigns/new`), in 5 steps:
+  1. Account and goal.
+  2. Budget and schedule, with a live "most this can spend" figure and the cap context.
+  3. Audience:
+     * Meta: locations and interests searched on the platform, age, gender.
+     * Google: locations, languages, keywords with broad/phrase/exact.
+  4. Ad:
+     * Meta: Facebook Page, an image from the **design library** (rendered at full size) or an upload, primary text / headline / description with counters, CTA, link; WhatsApp or Messenger for Messages; instant-form editor for Leads; up to 3 text variants.
+     * Google: responsive search ad with 3–15 headlines and 2–4 descriptions, final URL and paths.
+  5. Review, with live validation from the shared rules.
+* **Draft with AI:**
+  * Proposes a name, a budget (capped at the user's maximum), an audience, ad text and keywords/RSA.
+  * Locations and interests are resolved on the platform, and unresolved terms are reported.
+  * Nothing is saved until the user saves.
+* **Objectives:**
+  * Meta: Traffic, Engagement, Messages (WhatsApp / Messenger), Awareness, Leads (instant forms).
+  * Google: Search.
+* **Spend control:**
+  * Created **PAUSED** on the platform.
+  * **Owner/Admin only** may activate or raise a running budget, through a dialog showing the maximum possible spend and requiring the campaign name to be typed. The server recomputes the maximum.
+  * Optional **monthly spend cap** per ad account.
+  * Every approval is recorded and audited, and other Owners/Admins are emailed.
+  * Anyone managing ads can **pause**.
+* **Campaign page:**
+  * Status, structure, errors from the platform, and approval history.
+  * **Results:** 8 KPI tiles and a daily spend chart (accessible columns with hover/focus tooltips and a table view), 7 or 30 days.
+* **Background sync** (hourly and nightly):
+  * Imports campaigns created in Ads Manager or Google Ads, mirrors status changes made on the platform, and stores daily insights.
+  * **Never activates or raises budgets.**
+* **Lists and navigation:**
+  * A campaigns list with platform, status and account filters.
+  * Account pages showing spend, committed spend and the cap meter.
+  * The Advertising nav section is live; Ad Analytics remains Phase 17.
+
+### Database changes
+Migration `20261111071024_phase11_ads`:
+* Tables `ad_account`, `ad_campaign`, `ad_group`, `ad`, `ad_insight_daily` and `ad_approval` (all tenant-scoped).
+* Enums `AdPlatform`, `AdCampaignStatus` and `AdBudgetType`.
+* Plan limits gained `adAccounts`.
+* New permission `ads:approve` (Owner/Admin).
+
+### APIs
+See `API_DOCUMENTATION.md` → Phase 11 endpoints. New env: `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_LOGIN_CUSTOMER_ID`, `GOOGLE_ADS_API_VERSION`, `GOOGLE_ADS_API_URL`.
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Validation unit | ✅ 55 passed (7 new) |
+| API unit | ✅ 112 passed (9 new) |
+| API e2e | ✅ 118 passed (7 new) |
+| Web unit | ✅ 64 passed |
+| Lint, typecheck, build | ✅ |
+
+**Validation unit tests:**
+* Exact money conversions (minor units, zero-decimal currencies, micros; no float drift).
+* Maximum spend: lifetime, daily with an end date, open-ended to month end, a future start, and the share in this month.
+* Objective requirements, creative limits, the RSA rules, and Google's daily-only and no-schedule rules.
+* Spend confirmation schema; PATCH without defaults.
+
+**API unit tests** (adapters against a fake `fetch`):
+* **Meta:**
+  * The full create chain with every object PAUSED, minor-unit budgets and `appsecret_proof`.
+  * Resuming after a failure without recreating anything; WhatsApp message and lead-form ads.
+  * Activation order and pause-only-the-campaign.
+  * Insights parsing; user-facing error messages; token errors.
+* **Google:**
+  * Manager client discovery with the developer-token and `login-customer-id` headers.
+  * `validateOnly` before an atomic create, with the campaign PAUSED and micros.
+  * Status and budget updates; GAQL insights.
+  * Errors: an unapproved developer token, quota retries, policy messages, and authentication errors.
+
+**API e2e tests:**
+* Connect and the plan limit; only Owner/Admin may set caps.
+* Draft validation; creation PAUSED with resume after a transient failure; a permanent error shown.
+* **Spend rules:**
+  * A Manager gets 403.
+  * Missing confirmation gets 400; a lower maximum gets `SPEND_CHANGED`; going over the cap gets `SPEND_CAP_EXCEEDED`.
+  * An Owner succeeds, with approval, audit and the adapter call log checked.
+  * A budget increase needs approval; a decrease doesn't; anyone managing ads can pause.
+  * An Admin's approval emails the Owner.
+* The sync imports and mirrors without ever activating (asserted on the call log); insights totals (CTR, CPC, CPM).
+* Google Search creation; AI draft with platform-resolved targeting, a capped budget and unresolved terms reported, nothing saved.
+* Tenant isolation, read-only Viewer, and account removal blocked while a campaign is active.
+
+**Browser run** (Playwright, production build, real workers, API pointed at the extended local stand-in for the Meta Marketing API, Google Ads REST and an AI model): **27 checks passed with no console errors** (one expected 409 from the cap check).
+* Meta and Google accounts connected; a cap set.
+* An AI-drafted Meta Traffic campaign: Kochi and Shopping resolved on the platform, the budget capped at ₹1,500/day, two variants using a design rendered from the library.
+* Review showed "most this can spend ₹28,500".
+* Created with every object PAUSED.
+* A Manager sees no Activate button.
+* The Owner was blocked by a ₹10,000 cap, then activated within ₹50,000; the stand-in saw ads → ad set → campaign activated in that order.
+* Insights chart with tooltip and a table view; the Manager paused it.
+* An AI-drafted Google Search campaign was validated, then created PAUSED.
+* axe found no serious or critical violations: account page, builder review, activate dialog, campaign results (light and dark), campaigns list.
+* No horizontal scroll on mobile.
+
+**Found and fixed during the run:**
+* The chart used `role="img"` around focusable columns (axe nested-interactive); it is now a labelled group.
+* The chart scaled its SVG, enlarging text and columns; it now renders at the real pixel width.
+* Mobile date labels collided; they are now spaced by pixel width.
+* One run showed an intermittent React hydration warning (#418) that did not reproduce in three later runs, even with URL tagging; it is noted for Phase 20 QA.
+
+### Remaining issues / notes
+* **Live platforms not tested yet.** Meta needs Marketing API App Review / Advanced Access and Business Verification; Google needs a developer token with Basic access and a verified consent screen.
+* **Not built yet:**
+  * Google Display, Video and Performance Max.
+  * Meta video ads and carousels.
+  * Automatic import of Meta lead-form leads into the CRM (Phase 13, `leads_retrieval`).
+  * Conversion tracking (Pixel / CAPI, Google conversions).
+* **Spend cap scope:** the cap counts recorded spend plus the committed maximum of campaigns activated in ZatGo. Campaigns activated directly on the platform are mirrored, and they count once their status syncs.
+* **Insights** are as fresh as the hourly sync, and platforms may revise recent days. The nightly 30-day sync re-reads them.
+
+### Next phase
+**Phase 12: Campaign management.** Multi-channel campaigns that group organic posts, ads, budgets, audiences and leads, with schedule, assets and conversion tracking across channels.
