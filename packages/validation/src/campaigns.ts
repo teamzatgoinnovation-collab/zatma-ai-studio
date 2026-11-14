@@ -462,7 +462,7 @@ export interface CampaignAnalyticsDto {
     platformLeads: number;
     platformConversions: number;
     postsPublished: number;
-    /** Leads ÷ link clicks, as a percentage (null without clicks) */
+    /** Leads ÷ link clicks, as a percentage (null without clicks). Can exceed 100%: leads also come from forms and ads. */
     clickToLead: number | null;
     /** Won deals ÷ leads, as a percentage (null without leads) */
     leadToWon: number | null;

@@ -36,7 +36,7 @@ export const Alert = ({
     role="alert"
     className={cn(
       'rounded-xl border px-4 py-3 text-sm',
-      tone === 'danger' ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'border-primary/30 bg-primary/10 text-primary',
+      tone === 'danger' ? 'border-destructive/30 bg-destructive/10 text-destructive-text' : 'border-primary/30 bg-primary/10 text-primary',
       className,
     )}
     {...props}

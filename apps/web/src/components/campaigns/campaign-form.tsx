@@ -250,7 +250,7 @@ function CampaignFormInner({
               </Button>
               <span className="text-xs text-muted-foreground">Uses AI credits. Set the dates and budget first for a dated plan and exact budget split.</span>
             </div>
-            {rationale && <Alert>{rationale}</Alert>}
+            {rationale && <Alert tone="info">{rationale}</Alert>}
           </CardContent>
         </Card>
       )}
@@ -329,7 +329,7 @@ function CampaignFormInner({
             <Label htmlFor="end">Last day</Label>
             <Input id="end" type="date" value={f.endDate} min={f.startDate || undefined} onChange={(e) => set('endDate', e.target.value)} aria-invalid={datesBad || undefined} aria-describedby={datesBad ? 'end-error' : undefined} />
             {datesBad && (
-              <p id="end-error" className="text-xs text-destructive">
+              <p id="end-error" className="text-xs text-destructive-text">
                 The last day must be on or after the first day.
               </p>
             )}
@@ -341,7 +341,7 @@ function CampaignFormInner({
           <div className="space-y-1.5">
             <Label htmlFor="budget">Total budget (optional)</Label>
             <Input id="budget" inputMode="decimal" placeholder="50000" value={f.budgetAmount} onChange={(e) => set('budgetAmount', e.target.value.trim())} aria-invalid={!budgetValid || undefined} />
-            {!budgetValid && <p className="text-xs text-destructive">Enter an amount like 50000 or 4999.50</p>}
+            {!budgetValid && <p className="text-xs text-destructive-text">Enter an amount like 50000 or 4999.50</p>}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="currency">Currency</Label>

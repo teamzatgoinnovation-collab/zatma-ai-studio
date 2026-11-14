@@ -133,6 +133,13 @@
   * The UI also asks the approver to type the campaign name.
 * **Ad platform credentials:** grants are stored with the same AES-256-GCM token encryption as social accounts. The Google Ads developer token is a server-side secret sent only as a request header.
 * **AI-planned audiences** are resolved through the platforms' own search APIs; ids suggested by the model are never used. AI output is a draft only; it is never saved or published automatically.
+* **Campaigns (Phase 12) never start spend.** A campaign's status is a planning status. Marking it ready, scheduling and resuming change no ad. Pausing or cancelling can pause linked ads (that stops spend) and unschedule posts; each needs its own permission (`ads:manage`, `social:publish`), and items the user can't change are reported instead. Resume only lists paused ads with links to the Phase 11 approval. The e2e and browser tests assert that no activation reaches the platform.
+* **Tracked links:**
+  * Destinations are http/https URLs set by campaign editors (no `javascript:` or other schemes); the redirect only ever goes to a stored destination, so it is not an open redirect.
+  * The redirect is public, rate-limited per IP (120/min), sent with `Cache-Control: no-store` and `X-Robots-Tag: noindex`, and unknown slugs get a plain 404 page.
+  * **Click privacy:** no IP address, user agent or cookie is stored. Unique visitors are estimated with an HMAC (server secret) of IP + user agent kept in Redis for 24 hours only; Postgres holds counts. Link-preview bots are redirected but not counted.
+* **Lead attribution** respects CRM access: attaching leads needs `crm:write`, and campaign lead lists and audience counts are limited to the records the user can see (Sales Agents: their own).
+* **Meta lead import** is read-only, idempotent on the platform lead id, doesn't duplicate people already in the CRM, and stops (leaving leads on Meta) when the plan's CRM limit is reached.
 * WhatsApp and email require recorded opt-in consent, and opt-out is honoured immediately (Phase 14).
 
 ## Operations (Phase 21)

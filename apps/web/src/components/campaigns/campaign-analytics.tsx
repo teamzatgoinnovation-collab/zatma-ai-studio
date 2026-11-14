@@ -87,7 +87,7 @@ function AnalyticsBody({ a, currency, metric, setMetric, table, setTable }: { a:
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tile label="Leads" value={n(t.leads)} hint={`${n(t.platformLeads)} reported by ad platforms`} />
         <Tile label="Won deals" value={n(t.wonDeals)} hint={moneyList(t.wonValue, 'No revenue yet')} />
-        <Tile label="Link clicks" value={n(t.linkClicks)} hint={`${n(t.uniqueClicks)} unique · ${pct(t.clickToLead)} became leads`} />
+        <Tile label="Link clicks" value={n(t.linkClicks)} hint={`${n(t.uniqueClicks)} unique visitors`} />
         <Tile label="Ad spend" value={moneyList(t.spend, formatMoney('0', currency))} hint={`${n(t.impressions)} impressions · ${n(t.adClicks)} ad clicks`} />
       </div>
       <div className="grid gap-3 sm:grid-cols-3">

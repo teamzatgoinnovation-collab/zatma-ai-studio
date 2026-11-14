@@ -93,11 +93,23 @@ Plan limits gained `adAccounts` (Free 0, Starter 1, Professional 3, Business 10,
 
 Encrypted columns use AES-256-GCM with the row's identity as associated data (see SECURITY.md).
 
+## Campaigns (Phase 12)
+
+| Table | Key fields |
+|---|---|
+| `campaign` ✅ | organizationId, workspaceId, number (unique per org, shown as CMP-0001), name, type, objective, description, ownerId, startAt, endAt, timezone, status (MarketingCampaignStatus, derived and stored), manualStatus (PAUSED / CANCELLED), readyAt, budgetAmount Decimal?, currency, channels[], audience (JSON: description, locations, ages, interests, CRM segment), utmCampaign, createdById, deletedAt |
+| `campaign_channel_plan` ✅ | campaignId, channel, plannedBudget Decimal?, notes, content (JSON planned items with dates). Unique (campaign, channel) |
+| `campaign_asset` ✅ | campaignId, one of fileId / designId / copyAssetId, label |
+| `campaign_task` ✅ | campaignId, title, dueAt, done, assigneeId |
+| `tracked_link` ✅ | campaignId, slug (globally unique), destinationUrl, label, channel, utmSource, utmMedium, utmContent, utmTerm, clicks, uniqueClicks, deletedAt |
+| `tracked_link_click_daily` ✅ | linkId, campaignId, date, clicks, uniqueClicks. Unique (link, date). No visitor data |
+
+New nullable foreign keys (`ON DELETE SET NULL`): `campaignId` on `social_post`, `copy_asset` (these columns existed without a key), `design`, `lead`, `deal`; `marketingCampaignId` on `ad_campaign`. `lead` also gained `utm` (JSON) and `externalRef` (unique per org, e.g. `meta:<lead id>`). Plan limits gained `campaigns` (active campaigns: Free 2, Starter 10, Professional 50, Business 200, Agency unlimited).
+
 ## Marketing, social & ads (planned)
 
 | Table | Phase | Key fields |
 |---|---|---|
-| `campaign` | P12 | organizationId, name, type, objective, audience, startAt, endAt, budget, status, ownerId |
 | `automation`, `automation_node`, `automation_run`, `automation_run_step` | P13 | graph JSON, trigger, run logs |
 | `email_template`, `email_campaign`, `email_event` | P14 | |
 | `whatsapp_template`, `whatsapp_message` | P14 | |

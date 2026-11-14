@@ -159,7 +159,7 @@ export function MarketingCampaignPage({ id }: { id: string }) {
       </Card>
 
       {resumed && resumed.length > 0 && (
-        <Alert>
+        <Alert tone="info">
           <p className="font-medium">Paid ads stay paused.</p>
           <p className="text-sm">Resuming the campaign doesn&apos;t start spending. Review each ad campaign and activate it with the spend confirmation if you want it to run:</p>
           <ul className="mt-2 list-disc pl-5 text-sm">
@@ -702,7 +702,13 @@ function TrackingTab({ campaign: c, canWrite }: { campaign: MarketingCampaignDto
       toast.error('Copy failed');
     }
   };
-  const urlOk = /^https?:\/\/[^\s]+\.[^\s]+/.test(url.trim());
+  const urlOk = (() => {
+    try {
+      return ['http:', 'https:'].includes(new URL(url.trim()).protocol);
+    } catch {
+      return false;
+    }
+  })();
   return (
     <div className="space-y-4">
       {canWrite && (
@@ -972,7 +978,7 @@ function TasksTab({ campaign: c, canWrite }: { campaign: MarketingCampaignDto; c
                   <input type="checkbox" className="accent-primary" aria-label={`${t.done ? 'Reopen' : 'Complete'} ${t.title}`} checked={t.done} disabled={!canWrite} onChange={(e) => toggle.mutate({ id: t.id, done: e.target.checked })} />
                   <span className={`flex-1 ${t.done ? 'text-muted-foreground line-through' : ''}`}>{t.title}</span>
                   {t.dueAt && (
-                    <span className={overdue ? 'font-medium text-destructive' : 'text-muted-foreground'}>
+                    <span className={overdue ? 'font-medium text-destructive-text' : 'text-muted-foreground'}>
                       {overdue ? 'Overdue · ' : ''}
                       {formatInZone(t.dueAt, c.timezone, { dateStyle: 'medium' })}
                     </span>

@@ -145,12 +145,13 @@ A post is never shown as published until the platform returns a post id.
 
 ### Meta Marketing API
 1. Use the same Meta app as Phase 9 (`META_APP_ID` / `META_APP_SECRET`). Add the **Marketing API** product, and add `{API_URL}/api/v1/ads/oauth/meta_ads/callback` to the Valid OAuth Redirect URIs.
-2. Request App Review for `ads_management`, `ads_read`, `business_management` and `pages_manage_ads` (lead forms and Page creatives). Apply for **Advanced Access** to the Ads Management Standard Access tier, and complete Business Verification.
+2. Request App Review for `ads_management`, `ads_read`, `business_management`, `pages_manage_ads` (lead forms and Page creatives) and `leads_retrieval` (Phase 12: reading instant-form submissions into the CRM). Apply for **Advanced Access** to the Ads Management Standard Access tier, and complete Business Verification.
 3. **Endpoints used** (Graph `META_GRAPH_VERSION`, every call with `appsecret_proof`):
    * Accounts: `GET /me/adaccounts`.
    * Creation: `POST /act_{id}/adimages` (bytes), `/act_{id}/campaigns` (`status=PAUSED`, CBO `daily_budget` / `lifetime_budget` in minor units), `/act_{id}/adsets` (targeting, optimisation goal by objective), `/{page}/leadgen_forms` (with the Page token), `/act_{id}/adcreatives`, `/act_{id}/ads` (`status=PAUSED`).
    * Status and budget: `POST /{id}` `status` / budget.
    * Data: `GET /act_{id}/insights` (`level=campaign`, `time_increment=1`); `GET /search?type=adgeolocation|adinterest|adlocale`.
+   * Leads (Phase 12): `GET /{ad_id}/leads?fields=id,created_time,form_id,field_data` with a `time_created GREATER_THAN` filter, paged. Read-only; run every 15 minutes for Lead ads created in ZatGo or imported. Connections made before Phase 12 must be reconnected once to grant `leads_retrieval`.
 4. **Objective mapping:**
 
    | Objective | Meta objective | Optimisation goal |
@@ -177,3 +178,9 @@ A post is never shown as published until the platform returns a post id.
 
 ### Verification without keys
 The local stand-in implements these Marketing API and Google Ads endpoints. It refuses any campaign, ad set or ad that is not created PAUSED, enforces the developer-token header, and returns daily insights. The base URLs are overridable (`META_GRAPH_URL`, `GOOGLE_ADS_API_URL`); never override them in production.
+
+## Campaign tracking (Phase 12)
+* **Tracked links** are served by ZatGo itself at `{WEB_URL}/r/{slug}` (the web app proxies to `GET /api/v1/r/{slug}`). No third-party shortener is used. Point your production domain at the web app; nothing else is needed.
+* **UTM attribution:** a lead created with `utm.campaign` equal to a campaign's UTM slug is attributed to it. Pass the landing page's UTM parameters when creating leads from your own forms (Phase 15 landing pages will do this automatically).
+* **Meta lead forms:** see `leads_retrieval` above.
+* **Email and WhatsApp** channels can be planned on a campaign now; sending needs the Phase 14 integrations.
