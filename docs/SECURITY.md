@@ -139,6 +139,12 @@
   * The redirect is public, rate-limited per IP (120/min), sent with `Cache-Control: no-store` and `X-Robots-Tag: noindex`, and unknown slugs get a plain 404 page.
   * **Click privacy:** no IP address, user agent or cookie is stored. Unique visitors are estimated with an HMAC (server secret) of IP + user agent kept in Redis for 24 hours only; Postgres holds counts. Link-preview bots are redirected but not counted.
 * **Lead attribution** respects CRM access: attaching leads needs `crm:write`, and campaign lead lists and audience counts are limited to the records the user can see (Sales Agents: their own).
+* **Automations (Phase 13) never message customers.** Sending email or WhatsApp to a lead needs consent tracking, templates and unsubscribe (Phase 14), so those actions are refused when activating and again at run time. "Notify team", "Email team" and "Generate AI message" only reach people inside the organization; the AI draft is saved as a note for the owner to review and send.
+  * **Permissions.** A workflow runs as the member who activated it (or last edited it while active), with that member's permissions. Activating needs `automation:write` plus whatever its actions use (`crm:write`, `campaign:write`, `ai:generate`), and the server rejects it with the missing list otherwise. Every run re-checks that the owner is still a member with those permissions; if not, the run fails (`OWNER_PERMISSION_LOST`) and the workflow pauses. Editing a running workflow re-runs the activation checks for the editor.
+  * **Limits.** Per-workflow hourly rate and per-record cooldown, a loop-depth limit of 3 (and no self-restart), at most 50 steps per workflow and per run, delays up to 30 days, and the plan's monthly run quota. Ten failed runs in a row pause a workflow, and failure emails are limited to one an hour per workflow.
+  * **Logs.** Step outputs hold ids and counts only (no message bodies, phone numbers or emails). Merge fields come from a fixed list and nothing in a template is executed; unknown fields render empty.
+  * **Dry runs** (`/test`) read a real record but write, send and call AI nothing.
+  * **Tenant isolation.** Workflows, runs and enrollments are tenant models; the dispatcher and runner run inside the organization's context.
 * **Meta lead import** is read-only, idempotent on the platform lead id, doesn't duplicate people already in the CRM, and stops (leaving leads on Meta) when the plan's CRM limit is reached.
 * WhatsApp and email require recorded opt-in consent, and opt-out is honoured immediately (Phase 14).
 

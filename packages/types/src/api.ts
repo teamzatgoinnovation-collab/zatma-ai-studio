@@ -63,6 +63,8 @@ export interface PlanLimits {
   adAccounts: number;
   /** Campaigns that are not completed or cancelled (Phase 12). */
   campaigns: number;
+  /** Automation workflow runs per UTC calendar month (Phase 13). */
+  automationRuns: number;
 }
 
 export interface PlanSummary {

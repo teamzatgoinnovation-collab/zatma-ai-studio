@@ -18,6 +18,8 @@ import { SocialModule } from './social/social.module.js';
 import { PublishingModule } from './publishing/publishing.module.js';
 import { AdsModule } from './ads/ads.module.js';
 import { CampaignsModule } from './campaigns/campaigns.module.js';
+import { AutomationEventsModule } from './automation/automation-events.service.js';
+import { AutomationModule } from './automation/automation.module.js';
 import { DesignModule } from './design/design.module.js';
 import { DevModule } from './dev/dev.module.js';
 import { EmailModule } from './email/email.module.js';
@@ -76,6 +78,8 @@ const bootEnv = loadEnv();
     PublishingModule,
     AdsModule,
     CampaignsModule,
+    AutomationEventsModule,
+    AutomationModule,
     ...(bootEnv.NODE_ENV === 'production' ? [] : [DevModule]),
   ],
   providers: [

@@ -17,6 +17,7 @@ import { paginate } from '../common/pagination.js';
 import { TenantContext } from '../common/tenant-context.js';
 import type { Pipeline, PipelineStage, Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AutomationEventsService } from '../automation/automation-events.service.js';
 import { CrmContext, dealInclude, ownerScope, positionBetween, searchOr, seesAllRecords, toDealDto, toStageDto } from './crm-common.js';
 
 type PipelineWithStages = Pipeline & { stages: PipelineStage[] };
@@ -36,6 +37,7 @@ export class PipelineService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crm: CrmContext,
+    private readonly events: AutomationEventsService,
   ) {}
 
   private get db() {
@@ -206,7 +208,7 @@ export class PipelineService {
       },
       include: dealInclude,
     });
-    if (d.status === 'WON' && d.contactId) await this.markCustomer(d.contactId);
+    await this.announceClose(d, null);
     return toDealDto(d);
   }
 
@@ -223,6 +225,7 @@ export class PipelineService {
       },
       include: dealInclude,
     });
+    await this.announceClose(d, current.status);
     return toDealDto(d);
   }
 
@@ -231,9 +234,21 @@ export class PipelineService {
     await this.db.deal.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
-  /** Winning a deal makes its contact a customer. */
-  private async markCustomer(contactId: string) {
-    await this.db.contact.updateMany({ where: { id: contactId, lifecycle: { in: ['LEAD', 'PROSPECT'] } }, data: { lifecycle: 'CUSTOMER' } });
+  /** Winning a deal makes its contact a customer. Returns whether the contact just became one. */
+  private async markCustomer(contactId: string): Promise<boolean> {
+    return (await this.db.contact.updateMany({ where: { id: contactId, lifecycle: { in: ['LEAD', 'PROSPECT'] } }, data: { lifecycle: 'CUSTOMER' } })).count > 0;
+  }
+
+  /** Tells automations a deal was won or lost (and that a contact became a customer), once the write is done. */
+  private async announceClose(d: { id: string; status: string; value: unknown; contactId: string | null }, previousStatus: string | null) {
+    if (d.status === previousStatus) return;
+    if (d.status === 'WON') {
+      const becameCustomer = d.contactId ? await this.markCustomer(d.contactId) : false;
+      void this.events.emit({ kind: 'deal.won', entityType: 'deal', entityId: d.id, payload: { value: Number(d.value) } });
+      if (becameCustomer) void this.events.emit({ kind: 'contact.became_customer', entityType: 'contact', entityId: d.contactId! });
+    } else if (d.status === 'LOST') {
+      void this.events.emit({ kind: 'deal.lost', entityType: 'deal', entityId: d.id, payload: { value: Number(d.value) } });
+    }
   }
 
   /** Moves a card to a stage (before `beforeId`, or to the end). Won/lost stages close the deal. */
@@ -264,7 +279,7 @@ export class PipelineService {
       },
       include: dealInclude,
     });
-    if (!sameStage && stage.kind === 'WON' && d.contactId) await this.markCustomer(d.contactId);
+    if (!sameStage) await this.announceClose(d, deal.status);
     return toDealDto(d);
   }
 

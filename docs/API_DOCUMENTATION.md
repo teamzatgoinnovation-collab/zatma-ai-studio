@@ -352,3 +352,22 @@ Changes to existing endpoints:
 * `POST /social/posts` and `PATCH /social/posts/:id` accept `campaignId`.
 * `POST /ads/campaigns` and `PATCH /ads/campaigns/:id` accept `marketingCampaignId`.
 * `POST /crm/leads` accepts `utm` and `campaignId`; lead responses include `campaign` and `utm`.
+
+## Phase 13 endpoints
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET / POST | `/automations[?status&trigger&q]` | `automation:read` / `automation:write` | List with this month's runs, failures and last run / create `{ name, description?, graph: { nodes, edges }, settings? }` as a draft (invalid drafts are allowed; the response lists `issues[]`) |
+| GET | `/automations/templates` | `automation:read` | Starter workflows, including the hot Meta lead example |
+| GET | `/automations/stats` | `automation:read` | `{ runsThisMonth, runLimit, succeeded, failed, skipped, daily[] }` |
+| GET / PATCH / DELETE | `/automations/:id` | read / write | PATCH leaves omitted fields unchanged and bumps `version` only when the graph really changed (key order is ignored). Editing an active workflow re-checks the editor's permissions and makes them the owner. Delete stops it at once and keeps its runs |
+| POST | `/automations/:id/activate` | `automation:write` | 403 `AUTOMATION_PERMISSION_MISSING` (with `missing[]`) when you lack a permission its actions use; 422 `AUTOMATION_INVALID` (with `issues[]`) for an invalid graph, a Phase 14 action, someone no longer on the team or a missing campaign |
+| POST | `/automations/:id/pause` | `automation:write` | Stops new runs; runs waiting on a delay are cancelled when they resume |
+| POST | `/automations/:id/test` | `automation:write` | `{ entityType, entityId }` → `{ path[], wouldWrite[] }`. A dry run: nothing is written, sent or charged. 422 `WRONG_RECORD_TYPE` |
+| GET | `/automations/:id/runs`, `/automations/runs[?status&entityId]` | `automation:read` | Runs with trigger record, status, skip reason, depth |
+| GET | `/automations/runs/:runId` | `automation:read` | One run with its steps (status, attempts, redacted output, error) |
+| POST | `/automations/runs/:runId/retry` | `automation:write` | Resume a FAILED run from the failed step (409 unless the workflow is active) |
+
+Run skip reasons: `LOOP_DEPTH`, `LOOP_SELF`, `COOLDOWN`, `RATE_LIMIT`, `QUOTA`.
+
+Changes to existing endpoints: lead, deal and contact changes made through the CRM API emit automation events.

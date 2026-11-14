@@ -254,3 +254,25 @@ On the web, the composer validates live with the shared `validatePost` (`package
 * **Attribution:** `LeadsService.create` sets `campaignId` from an explicit id or a matching `utm.campaign` (first touch). Converting a lead carries the campaign to its deal; won deals are conversions.
 * **Queue `campaigns`:** hourly status sweep, and a Meta lead-form pull every 15 minutes (`GET /{ad_id}/leads` since a per-ad-campaign watermark in `syncState.leadsSince`).
 * **Tracked links:** `GET /api/v1/r/:slug` (public). Clicks are counted with atomic increments on `tracked_link` and `tracked_link_click_daily`; uniqueness uses a 24-hour Redis key.
+
+## Automation (Phase 13)
+
+* **Model:** a workflow is an acyclic graph: one trigger, then conditions (Yes / No branches), actions and delays (`packages/validation/src/automation.ts`). `validateWorkflow`, the condition evaluators and the merge-field renderer are shared by the editor and the API.
+* **Event flow:**
+  1. CRM and campaign services call `AutomationEventsService.emit()` after their write completes (fire-and-forget, never fails the change). Sources: lead created / status changed, deal won / lost, contact became a customer, lead attributed to a campaign, Meta lead-form import. CSV imports deliberately emit nothing.
+  2. The `automation-events` worker (**dispatcher**) loads ACTIVE workflows for the trigger kind, applies the trigger's filters, then decides whether to start a run (below), snapshots the graph, and queues `automation-runs`.
+  3. The `automation-runs` worker (**runner**) walks the graph, recording every step.
+  4. An hourly **scanner** emits the two time-based triggers (follow-up overdue, customer inactive), once per occurrence (the key includes the due date or last contact).
+* **Guards, in this order:**
+  * **Loop depth.** An action's changes carry the run's depth (`TenantContext.automation`). A run started by an automation's change is one level deeper, and level 3 is skipped (`LOOP_DEPTH`). A workflow never restarts itself (`LOOP_SELF`).
+  * **Cooldown** per workflow and record (default 60 minutes).
+  * **Hourly rate** per workflow (default 200), and the plan's **monthly quota**. These skips are recorded once an hour, not per event. Quota exhaustion emails Owners/Admins once a day.
+  * The same event never starts the same workflow twice (unique dedupe key). Rate and cooldown checks are approximate under heavy concurrency; they bound damage rather than count exactly.
+* **Runner details:**
+  * Completed steps are never repeated, so retries and resumes are safe.
+  * A delay sets the run WAITING and re-queues it with the delay (up to 30 days); the steps after it see the record as it is then.
+  * Transient errors (timeouts, 5xx, 429) retry up to 3 times with backoff; validation, permission and plan errors fail at once.
+  * A failed run can be resumed from its failed step.
+* **Runs as the activator.** The workflow runs inside a `TenantContext` for its owner, so the CRM services apply that person's role (record ownership, who may assign). Permissions are checked at activation and again at every run.
+* **Customer messaging is out of scope until Phase 14.** `email_lead` and `whatsapp_lead` exist in the catalogue but are refused at activation and at run time. Internal emails (notify / email team) go through the existing `EmailService`.
+* **Editor:** `@xyflow/react` canvas. Every action available by drag is also available from the step list and the inspector's "What happens next" selects, so a workflow can be built with the keyboard.

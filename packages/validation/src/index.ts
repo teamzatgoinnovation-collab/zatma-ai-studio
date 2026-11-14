@@ -234,3 +234,4 @@ export * from './publishing.js';
 export { withoutDefaults } from './patch.js';
 export * from './ads.js';
 export * from './campaigns.js';
+export * from './automation.js';

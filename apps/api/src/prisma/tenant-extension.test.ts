@@ -6,7 +6,7 @@ const ORG = 'org-a';
 
 describe('tenant scoping', () => {
   it('covers the Phase 1 tenant models', () => {
-    expect([...TENANT_MODELS].sort()).toEqual(['Activity', 'Ad', 'AdAccount', 'AdApproval', 'AdCampaign', 'AdGroup', 'AdInsightDaily', 'AiUsage', 'AuditLog', 'BrandKit', 'Campaign', 'CampaignAsset', 'CampaignChannelPlan', 'CampaignTask', 'Company', 'Contact', 'CopyAsset', 'CrmImport', 'Deal', 'Design', 'DesignVersion', 'GenerationJob', 'Invoice', 'Lead', 'Payment', 'Pipeline', 'PipelineStage', 'SocialAccount', 'SocialConnection', 'SocialPost', 'SocialPostTarget', 'StoredFile', 'Template', 'TrackedLink', 'TrackedLinkClickDaily', 'Workspace']);
+    expect([...TENANT_MODELS].sort()).toEqual(['Activity', 'Ad', 'AdAccount', 'AdApproval', 'AdCampaign', 'AdGroup', 'AdInsightDaily', 'AiUsage', 'AuditLog', 'AutomationRun', 'AutomationRunStep', 'AutomationWorkflow', 'BrandKit', 'Campaign', 'CampaignAsset', 'CampaignChannelPlan', 'CampaignEnrollment', 'CampaignTask', 'Company', 'Contact', 'CopyAsset', 'CrmImport', 'Deal', 'Design', 'DesignVersion', 'GenerationJob', 'Invoice', 'Lead', 'Payment', 'Pipeline', 'PipelineStage', 'SocialAccount', 'SocialConnection', 'SocialPost', 'SocialPostTarget', 'StoredFile', 'Template', 'TrackedLink', 'TrackedLinkClickDaily', 'Workspace']);
   });
 
   it('adds organizationId to read, update and delete filters', () => {

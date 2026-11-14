@@ -130,6 +130,14 @@ import type {
   TrackedLinkDto,
   TrackedLinkInput,
   UpdateMarketingCampaignRequest,
+  AutomationStatsDto,
+  CreateWorkflowRequest,
+  RunDto,
+  TestRunInput,
+  TestRunResult,
+  UpdateWorkflowRequest,
+  WorkflowDto,
+  WorkflowTemplate,
 } from '@zatma/validation';
 
 export class ApiError extends Error {
@@ -383,6 +391,25 @@ export function createApiClient(options: ApiClientOptions) {
         budget: (campaignId: string, input: { budgetAmount: string; confirm?: true; maxSpend?: string }) => request<AdCampaignDto>('POST', `/ads/campaigns/${id(campaignId)}/budget`, input),
         insights: (campaignId: string, from: string, to: string) => request<AdInsights>('GET', `/ads/campaigns/${id(campaignId)}/insights`, undefined, { from, to }),
       },
+    },
+    /** Marketing automation (Phase 13). Customer messaging actions are not available until Phase 14. */
+    automation: {
+      list: (query?: { status?: string; trigger?: string; q?: string; page?: number; pageSize?: number }) => request<Paginated<WorkflowDto>>('GET', '/automations', undefined, query),
+      templates: () => request<WorkflowTemplate[]>('GET', '/automations/templates'),
+      stats: () => request<AutomationStatsDto>('GET', '/automations/stats'),
+      get: (workflowId: string) => request<WorkflowDto>('GET', `/automations/${id(workflowId)}`),
+      create: (input: CreateWorkflowRequest) => request<WorkflowDto>('POST', '/automations', input),
+      update: (workflowId: string, input: UpdateWorkflowRequest) => request<WorkflowDto>('PATCH', `/automations/${id(workflowId)}`, input),
+      remove: (workflowId: string) => request<void>('DELETE', `/automations/${id(workflowId)}`),
+      /** Starts running with your permissions. */
+      activate: (workflowId: string) => request<WorkflowDto>('POST', `/automations/${id(workflowId)}/activate`),
+      pause: (workflowId: string) => request<WorkflowDto>('POST', `/automations/${id(workflowId)}/pause`),
+      /** Dry run against a real record: writes and sends nothing. */
+      test: (workflowId: string, input: TestRunInput) => request<TestRunResult>('POST', `/automations/${id(workflowId)}/test`, input),
+      runs: (query?: { status?: string; entityId?: string; page?: number; pageSize?: number }) => request<Paginated<RunDto>>('GET', '/automations/runs', undefined, query),
+      workflowRuns: (workflowId: string, query?: { status?: string; page?: number; pageSize?: number }) => request<Paginated<RunDto>>('GET', `/automations/${id(workflowId)}/runs`, undefined, query),
+      run: (runId: string) => request<RunDto>('GET', `/automations/runs/${id(runId)}`),
+      retryRun: (runId: string) => request<RunDto>('POST', `/automations/runs/${id(runId)}/retry`),
     },
     /** Multi-channel campaigns (Phase 12). Status changes here never activate ads or start spend. */
     campaigns: {

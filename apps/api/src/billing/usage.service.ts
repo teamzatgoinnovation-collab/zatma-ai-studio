@@ -36,7 +36,7 @@ export class UsageService {
     const periodStart = subscription?.currentPeriodStart ?? new Date(Date.now() - 30 * 24 * 3600 * 1000);
     const month = monthWindow(new Date());
     const inMonth = { gte: month.start, lt: month.end };
-    const [members, pendingInvitations, workspaces, storage, credits, leads, contacts, socialAccounts, posts, adAccounts, campaigns] = await Promise.all([
+    const [members, pendingInvitations, workspaces, storage, credits, leads, contacts, socialAccounts, posts, adAccounts, campaigns, automationRuns] = await Promise.all([
       db.member.count({ where: { organizationId } }),
       db.invitation.count({ where: { organizationId, status: 'pending', expiresAt: { gt: new Date() } } }),
       db.workspace.count({ where: { organizationId } }),
@@ -57,6 +57,8 @@ export class UsageService {
       }),
       db.adAccount.count({ where: { organizationId } }),
       db.campaign.count({ where: { organizationId, deletedAt: null, status: { notIn: ['COMPLETED', 'CANCELLED'] } } }),
+      // Runs that executed this month; skipped runs don't count against the quota.
+      db.automationRun.count({ where: { organizationId, status: { not: 'SKIPPED' }, startedAt: inMonth } }),
     ]);
     return {
       members: members + pendingInvitations,
@@ -68,6 +70,7 @@ export class UsageService {
       postsPerMonth: posts,
       adAccounts,
       campaigns,
+      automationRuns,
     };
   }
 
@@ -94,7 +97,7 @@ export class UsageService {
   /** Metrics where current usage exceeds `limits` (used to block downgrades). */
   exceeded(used: Record<UsageMetric, number>, limits: PlanLimits): Array<{ metric: UsageMetric; used: number; limit: number }> {
     return (Object.keys(used) as UsageMetric[])
-      .filter((m) => m !== 'aiCredits' && m !== 'postsPerMonth')
+      .filter((m) => m !== 'aiCredits' && m !== 'postsPerMonth' && m !== 'automationRuns')
       .map((metric) => ({ metric, used: used[metric], limit: limits[metric] }))
       .filter((x) => x.limit !== UNLIMITED && x.used > x.limit);
   }
@@ -110,4 +113,5 @@ export const METRIC_LABELS: Record<UsageMetric, string> = {
   postsPerMonth: 'social posts per month',
   adAccounts: 'ad accounts',
   campaigns: 'active campaigns',
+  automationRuns: 'automation runs per month',
 };
