@@ -12,6 +12,7 @@ import { ScoringService } from '../crm/scoring.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ProviderAuthError } from '../social/providers/provider.js';
+import { AutomationEventsService } from '../automation/automation-events.service.js';
 import { CampaignsService } from './campaigns.service.js';
 
 export const CAMPAIGNS_QUEUE = 'campaigns';
@@ -48,6 +49,7 @@ export class CampaignsWorkerService {
     private readonly scoring: ScoringService,
     private readonly usage: UsageService,
     private readonly audit: AuditService,
+    private readonly events: AutomationEventsService,
   ) {}
 
   sweep() {
@@ -144,6 +146,10 @@ export class CampaignsWorkerService {
     await db.activity.create({ data: { organizationId, type: 'NOTE', subject: `Lead from Meta instant form (${adName})`, leadId: lead.id } });
     await this.scoring.scoreOne(lead.id).catch(() => undefined);
     await this.audit.record('campaigns.lead_imported', 'lead', lead.id, { source: 'meta_ads', campaignId });
+    // The lead is scored by now, so conditions on score see it.
+    void this.events.emit({ kind: 'lead.created', entityType: 'lead', entityId: lead.id, payload: { source: 'meta_ads' } });
+    void this.events.emit({ kind: 'form.submitted', entityType: 'lead', entityId: lead.id, payload: { campaignId, source: 'meta_ads' } });
+    if (campaignId) void this.events.emit({ kind: 'campaign.interaction', entityType: 'lead', entityId: lead.id, payload: { campaignId } });
     return 'created';
   }
 }

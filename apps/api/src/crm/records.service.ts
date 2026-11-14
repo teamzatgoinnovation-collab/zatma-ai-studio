@@ -18,6 +18,7 @@ import { paginate } from '../common/pagination.js';
 import { TenantContext } from '../common/tenant-context.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AutomationEventsService } from '../automation/automation-events.service.js';
 import {
   activityInclude,
   companyInclude,
@@ -42,6 +43,7 @@ export class ContactsService {
     private readonly prisma: PrismaService,
     private readonly crm: CrmContext,
     private readonly usage: UsageService,
+    private readonly events: AutomationEventsService,
   ) {}
 
   private get db() {
@@ -119,6 +121,7 @@ export class ContactsService {
         ...(data.email !== undefined || data.phone !== undefined ? await this.crm.keys(email, phone) : {}),
       },
     });
+    if (data.lifecycle === 'CUSTOMER' && current.lifecycle !== 'CUSTOMER') void this.events.emit({ kind: 'contact.became_customer', entityType: 'contact', entityId: id });
     return this.get(id);
   }
 

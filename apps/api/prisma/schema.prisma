@@ -36,23 +36,25 @@ model User {
   designs            Design[]
   designVersions     DesignVersion[]
   copyAssets         CopyAsset[]
-  ownedLeads         Lead[]             @relation("LeadOwner")
-  ownedContacts      Contact[]          @relation("ContactOwner")
-  ownedCompanies     Company[]          @relation("CompanyOwner")
-  ownedDeals         Deal[]             @relation("DealOwner")
-  activities         Activity[]         @relation("ActivityOwner")
-  createdActs        Activity[]         @relation("ActivityCreator")
+  ownedLeads         Lead[]               @relation("LeadOwner")
+  ownedContacts      Contact[]            @relation("ContactOwner")
+  ownedCompanies     Company[]            @relation("CompanyOwner")
+  ownedDeals         Deal[]               @relation("DealOwner")
+  activities         Activity[]           @relation("ActivityOwner")
+  createdActs        Activity[]           @relation("ActivityCreator")
   crmImports         CrmImport[]
   socialConnections  SocialConnection[]
   socialAccounts     SocialAccount[]
-  socialPosts        SocialPost[]       @relation("PostCreator")
-  approvedPosts      SocialPost[]       @relation("PostApprover")
-  adCampaigns        AdCampaign[]       @relation("AdCampaignCreator")
-  activatedCampaigns AdCampaign[]       @relation("AdCampaignActivator")
+  socialPosts        SocialPost[]         @relation("PostCreator")
+  approvedPosts      SocialPost[]         @relation("PostApprover")
+  adCampaigns        AdCampaign[]         @relation("AdCampaignCreator")
+  activatedCampaigns AdCampaign[]         @relation("AdCampaignActivator")
   adApprovals        AdApproval[]
-  ownedCampaigns     Campaign[]         @relation("CampaignOwner")
-  createdCampaigns   Campaign[]         @relation("CampaignCreator")
+  ownedCampaigns     Campaign[]           @relation("CampaignOwner")
+  createdCampaigns   Campaign[]           @relation("CampaignCreator")
   campaignTasks      CampaignTask[]
+  automationsOwned   AutomationWorkflow[] @relation("AutomationOwner")
+  automationsCreated AutomationWorkflow[] @relation("AutomationCreator")
 
   @@map("user")
 }
@@ -129,43 +131,47 @@ model Organization {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt
 
-  members           Member[]
-  invitations       Invitation[]
-  workspaces        Workspace[]
-  subscription      Subscription?
-  auditLogs         AuditLog[]
-  files             StoredFile[]
-  aiUsage           AiUsage[]
-  generationJobs    GenerationJob[]
-  brandKits         BrandKit[]
-  designs           Design[]
-  templates         Template[]
-  copyAssets        CopyAsset[]
-  leads             Lead[]
-  contacts          Contact[]
-  companies         Company[]
-  pipelines         Pipeline[]
-  deals             Deal[]
-  activities        Activity[]
-  crmImports        CrmImport[]
-  socialConnections SocialConnection[]
-  socialAccounts    SocialAccount[]
-  socialPosts       SocialPost[]
-  socialPostTargets SocialPostTarget[]
-  adAccounts        AdAccount[]
-  adCampaigns       AdCampaign[]
-  adGroups          AdGroup[]
-  ads               Ad[]
-  adInsights        AdInsightDaily[]
-  adApprovals       AdApproval[]
-  invoices          Invoice[]
-  payments          Payment[]
-  campaigns         Campaign[]
-  campaignPlans     CampaignChannelPlan[]
-  campaignAssets    CampaignAsset[]
-  campaignTasks     CampaignTask[]
-  trackedLinks      TrackedLink[]
-  trackedLinkDays   TrackedLinkClickDaily[]
+  members             Member[]
+  invitations         Invitation[]
+  workspaces          Workspace[]
+  subscription        Subscription?
+  auditLogs           AuditLog[]
+  files               StoredFile[]
+  aiUsage             AiUsage[]
+  generationJobs      GenerationJob[]
+  brandKits           BrandKit[]
+  designs             Design[]
+  templates           Template[]
+  copyAssets          CopyAsset[]
+  leads               Lead[]
+  contacts            Contact[]
+  companies           Company[]
+  pipelines           Pipeline[]
+  deals               Deal[]
+  activities          Activity[]
+  crmImports          CrmImport[]
+  socialConnections   SocialConnection[]
+  socialAccounts      SocialAccount[]
+  socialPosts         SocialPost[]
+  socialPostTargets   SocialPostTarget[]
+  adAccounts          AdAccount[]
+  adCampaigns         AdCampaign[]
+  adGroups            AdGroup[]
+  ads                 Ad[]
+  adInsights          AdInsightDaily[]
+  adApprovals         AdApproval[]
+  invoices            Invoice[]
+  payments            Payment[]
+  campaigns           Campaign[]
+  campaignPlans       CampaignChannelPlan[]
+  campaignAssets      CampaignAsset[]
+  campaignTasks       CampaignTask[]
+  trackedLinks        TrackedLink[]
+  trackedLinkDays     TrackedLinkClickDaily[]
+  automationWorkflows AutomationWorkflow[]
+  automationRuns      AutomationRun[]
+  automationSteps     AutomationRunStep[]
+  campaignEnrollments CampaignEnrollment[]
 
   @@map("organization")
 }
@@ -759,12 +765,13 @@ model Contact {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  company      Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  owner        User?        @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  owner        User?                @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   deals        Deal[]
   activities   Activity[]
   leads        Lead[]
+  enrollments  CampaignEnrollment[]
 
   @@index([organizationId, ownerId])
   @@index([organizationId, lifecycle])
@@ -820,12 +827,13 @@ model Lead {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  owner            User?        @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  convertedContact Contact?     @relation(fields: [convertedContactId], references: [id], onDelete: SetNull)
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner            User?                @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  convertedContact Contact?             @relation(fields: [convertedContactId], references: [id], onDelete: SetNull)
   activities       Activity[]
   deals            Deal[]
-  campaign         Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaign         Campaign?            @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  enrollments      CampaignEnrollment[]
 
   @@unique([organizationId, externalRef])
   @@index([organizationId, ownerId])
@@ -1398,6 +1406,7 @@ model Campaign {
   copyAssets   CopyAsset[]
   leads        Lead[]
   deals        Deal[]
+  enrollments  CampaignEnrollment[]
 
   @@unique([organizationId, number])
   @@index([organizationId, status])
@@ -1510,4 +1519,144 @@ model TrackedLinkClickDaily {
   @@unique([linkId, date])
   @@index([campaignId, date])
   @@map("tracked_link_click_daily")
+}
+
+// ───────────────────────────── Automation (Phase 13) ─────────────────────────────
+
+enum AutomationStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum AutomationRunStatus {
+  RUNNING
+  WAITING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+
+enum AutomationStepStatus {
+  SUCCEEDED
+  FAILED
+  SKIPPED
+  WAITING
+}
+
+/// A trigger → condition → action graph. Runs with the permissions of `owner` (whoever last activated it).
+model AutomationWorkflow {
+  id                  String           @id @default(uuid(7))
+  organizationId      String
+  name                String
+  description         String           @default("")
+  status              AutomationStatus @default(DRAFT)
+  /// workflowGraphSchema
+  graph               Json
+  /// Incremented on every graph change; runs keep a snapshot of the version they started with
+  version             Int              @default(1)
+  /// Denormalised from the graph for dispatch
+  triggerKind         String?
+  /// workflowSettingsSchema: maxRunsPerHour, reentryCooldownMinutes
+  settings            Json             @default("{}")
+  ownerId             String?
+  activatedAt         DateTime?
+  pausedReason        String?
+  consecutiveFailures Int              @default(0)
+  lastFailureEmailAt  DateTime?
+  createdById         String?
+  deletedAt           DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User?           @relation("AutomationOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy    User?           @relation("AutomationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  runs         AutomationRun[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, triggerKind, status])
+  @@map("automation_workflow")
+}
+
+model AutomationRun {
+  id             String              @id @default(uuid(7))
+  organizationId String
+  workflowId     String
+  version        Int
+  graphSnapshot  Json
+  /// The event that started it
+  triggerKind    String
+  entityType     String
+  entityId       String
+  /// Small, redacted facts about the event
+  payload        Json                @default("{}")
+  /// workflow + event id: the same event never starts the same workflow twice
+  dedupeKey      String
+  status         AutomationRunStatus @default(RUNNING)
+  skipReason     String?
+  /// How many automation-made changes led here (loop prevention)
+  depth          Int                 @default(0)
+  /// Node to continue from after a delay or a retry
+  resumeNodeId   String?
+  error          String?
+  startedAt      DateTime            @default(now())
+  finishedAt     DateTime?
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workflow     AutomationWorkflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  steps        AutomationRunStep[]
+
+  @@unique([workflowId, dedupeKey])
+  @@index([organizationId, startedAt])
+  @@index([workflowId, startedAt])
+  @@index([workflowId, entityType, entityId, startedAt])
+  @@map("automation_run")
+}
+
+model AutomationRunStep {
+  id             String               @id @default(uuid(7))
+  organizationId String
+  runId          String
+  nodeId         String
+  nodeType       String
+  kind           String
+  label          String               @default("")
+  status         AutomationStepStatus
+  attempts       Int                  @default(1)
+  /// What the step did (redacted: no message bodies, tokens or contact details beyond ids)
+  output         Json?
+  error          String?
+  startedAt      DateTime             @default(now())
+  finishedAt     DateTime?
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          AutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, nodeId])
+  @@map("automation_run_step")
+}
+
+/// A lead or contact enrolled in a campaign (Phase 14 sends to enrolled people)
+model CampaignEnrollment {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  campaignId     String
+  leadId         String?
+  contactId      String?
+  /// automation | manual
+  source         String   @default("automation")
+  workflowId     String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, leadId])
+  @@unique([campaignId, contactId])
+  @@index([organizationId, campaignId])
+  @@map("campaign_enrollment")
 }

@@ -120,7 +120,7 @@ export const NAV: NavSection[] = [
       { label: 'Content Calendar', href: '/marketing/calendar', description: 'Month, week, day and list views of scheduled content.', keywords: ['schedule', 'planner'] },
       { label: 'Email Marketing', href: '/marketing/email', phase: 14, description: 'Templates, segments and email campaigns.', features: ['Personalisation and scheduling', 'Bounce and unsubscribe handling', 'Delivery analytics'] },
       { label: 'WhatsApp Marketing', href: '/marketing/whatsapp', phase: 14, description: 'Template messages via the WhatsApp Business Platform.', features: ['Opt-in and consent tracking', 'Approved templates', 'Message status and CRM sync'] },
-      { label: 'Automation', href: '/marketing/automation', phase: 13, description: 'Visual trigger → condition → action workflows.', features: ['New lead, status change, inactivity triggers', 'Assign, notify, message, tag actions', 'Execution logs and loop prevention'], keywords: ['workflow'] },
+      { label: 'Automation', href: '/marketing/automation', description: 'Visual trigger → condition → action workflows with run logs.', keywords: ['workflow', 'rules', 'trigger', 'follow-up'] },
     ],
   },
   {

@@ -39,7 +39,7 @@ import { CompaniesService, ContactsService } from './records.service.js';
     FollowUpsController,
     ImportController,
   ],
-  exports: [CrmContext, LeadsService, ScoringService],
+  exports: [CrmContext, LeadsService, ContactsService, PipelineService, ActivitiesService, CrmAiService, ScoringService],
   providers: [CrmContext, LeadsService, ContactsService, CompaniesService, PipelineService, ActivitiesService, CrmImportService, CrmImportRunner, CrmImportProcessor, CrmSummaryService, ScoringService, ScoringScheduler, ScoringProcessor, CrmAiService],
 })
 export class CrmModule {}

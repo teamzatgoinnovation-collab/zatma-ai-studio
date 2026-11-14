@@ -78,6 +78,39 @@ export const emailTemplates = {
     };
   },
 
+  /** Internal notice from an automation (never sent to customers). */
+  automationNotice(input: { name: string; workflow: string; heading: string; message: string; url: string | null }): Template {
+    return {
+      tag: 'automation-notice',
+      subject: input.heading,
+      ...layout({
+        preheader: input.message.slice(0, 90),
+        heading: input.heading,
+        paragraphs: [`Hi ${input.name},`, input.message, `Sent by the automation “${input.workflow}”.`],
+        ...(input.url ? { action: { label: 'Open in ZatGo', url: input.url } } : {}),
+        footnote: 'This is an internal notification for your team, sent by an automation your organization set up.',
+      }),
+    };
+  },
+
+  automationFailed(input: { name: string; workflow: string; error: string; paused: boolean; url: string }): Template {
+    return {
+      tag: 'automation-failed',
+      subject: `Automation “${input.workflow}” had a failed run`,
+      ...layout({
+        preheader: input.error.slice(0, 90),
+        heading: input.paused ? 'An automation was paused' : 'An automation run failed',
+        paragraphs: [
+          `Hi ${input.name}, a run of “${input.workflow}” failed.`,
+          `Reason: ${input.error}`,
+          input.paused ? 'The automation was paused so it does not keep failing. Fix the problem and activate it again.' : 'It will keep running for new events. You can retry the failed run from the Runs tab.',
+        ],
+        action: { label: 'Open automation', url: input.url },
+        footnote: 'You are receiving this because you own this automation or are an Owner or Admin of the organization. Failure emails are sent at most once an hour per automation.',
+      }),
+    };
+  },
+
   postReviewed(input: { name: string; approved: boolean; reviewer: string; note: string | null; preview: string; url: string }): Template {
     return {
       tag: input.approved ? 'post-approved' : 'post-rejected',

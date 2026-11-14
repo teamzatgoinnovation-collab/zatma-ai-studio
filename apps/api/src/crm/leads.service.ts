@@ -17,6 +17,7 @@ import { paginate } from '../common/pagination.js';
 import { TenantContext } from '../common/tenant-context.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AutomationEventsService } from '../automation/automation-events.service.js';
 import { contactInclude, CrmContext, dealInclude, leadInclude, ownerScope, searchOr, seesAllRecords, toContactDto, toDealDto, toLeadDto } from './crm-common.js';
 import { PipelineService } from './pipeline.service.js';
 import { ScoringService } from './scoring.service.js';
@@ -31,6 +32,7 @@ export class LeadsService {
     private readonly usage: UsageService,
     private readonly pipelines: PipelineService,
     private readonly scoring: ScoringService,
+    private readonly events: AutomationEventsService,
   ) {}
 
   /** Rescore, then return the fresh DTO. */
@@ -97,7 +99,13 @@ export class LeadsService {
         campaignId: await this.attributeCampaign(campaignId, utm?.campaign),
       },
     });
-    return this.scored(lead.id);
+    const dto = await this.scored(lead.id);
+    // Bulk imports (skipLimit) don't start automations: thousands of rows at once should not fire thousands of runs.
+    if (!opts.skipLimit) {
+      void this.events.emit({ kind: 'lead.created', entityType: 'lead', entityId: lead.id, payload: { source: lead.source } });
+      if (lead.campaignId) void this.events.emit({ kind: 'campaign.interaction', entityType: 'lead', entityId: lead.id, payload: { campaignId: lead.campaignId } });
+    }
+    return dto;
   }
 
   /**
@@ -130,6 +138,8 @@ export class LeadsService {
         ...(campaignId !== undefined ? { campaignId: campaignId === null ? null : await this.attributeCampaign(campaignId, undefined) } : {}),
       },
     });
+    if (data.status !== undefined && data.status !== current.status) void this.events.emit({ kind: 'lead.status_changed', entityType: 'lead', entityId: id, payload: { from: current.status, to: data.status } });
+    if (campaignId && campaignId !== current.campaignId) void this.events.emit({ kind: 'campaign.interaction', entityType: 'lead', entityId: id, payload: { campaignId } });
     return this.scored(lead.id);
   }
 
@@ -150,10 +160,12 @@ export class LeadsService {
       return { updated: (await this.db.lead.updateMany({ where, data: { ownerId } })).count };
     }
     if (input.action === 'status') {
-      const ids = (await this.db.lead.findMany({ where, select: { id: true } })).map((r) => r.id);
+      const before = await this.db.lead.findMany({ where, select: { id: true, status: true } });
+      const ids = before.map((r) => r.id);
       const updated = (await this.db.lead.updateMany({ where: { id: { in: ids } }, data: { status: input.status! } })).count;
       const settings = await this.scoring.settings();
       for (const id of ids) await this.scoring.scoreOne(id, settings);
+      for (const b of before) if (b.status !== input.status) void this.events.emit({ kind: 'lead.status_changed', entityType: 'lead', entityId: b.id, payload: { from: b.status, to: input.status } });
       return { updated };
     }
     // tag: add to each lead that doesn't have it yet
@@ -246,6 +258,7 @@ export class LeadsService {
       return { contactId: contact.id, dealId };
     });
 
+    void this.events.emit({ kind: 'lead.status_changed', entityType: 'lead', entityId: id, payload: { from: lead.status, to: 'CONVERTED' } });
     const [updatedLead, contact, deal] = await Promise.all([
       this.db.lead.findFirstOrThrow({ where: { id }, include: leadInclude }),
       this.db.contact.findFirstOrThrow({ where: { id: result.contactId }, include: contactInclude }),

@@ -34,6 +34,7 @@ import { campaignCode, ownerScope } from '../crm/crm-common.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PublishingService } from '../publishing/publishing.service.js';
+import { AutomationEventsService } from '../automation/automation-events.service.js';
 
 const INCLUDE = {
   owner: { select: { id: true, name: true } },
@@ -80,6 +81,7 @@ export class CampaignsService {
     private readonly audit: AuditService,
     private readonly ads: AdsService,
     private readonly publishing: PublishingService,
+    private readonly events: AutomationEventsService,
   ) {}
 
   private get db() {
@@ -433,6 +435,7 @@ export class CampaignsService {
         const where = { id: { in: input.ids }, deletedAt: null, ...ownerScope(), ...scope };
         await check(await this.db.lead.count({ where }), 'leads');
         updated = (await this.db.lead.updateMany({ where, data: { campaignId: value } })).count;
+        if (!input.detach) for (const leadId of input.ids) void this.events.emit({ kind: 'campaign.interaction', entityType: 'lead', entityId: leadId, payload: { campaignId: id } });
         break;
       }
       case 'deal': {

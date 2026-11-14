@@ -66,6 +66,13 @@ const LABELS: Record<string, string> = {
   'campaigns.link_created': 'created a tracked link',
   'campaigns.link_deleted': 'deleted a tracked link',
   'campaigns.lead_imported': 'imported a lead from a Meta lead form',
+  'automation.created': 'created an automation',
+  'automation.updated': 'edited an automation',
+  'automation.deleted': 'deleted an automation',
+  'automation.activated': 'activated an automation',
+  'automation.paused': 'paused an automation',
+  'automation.run_failed': 'had an automation run fail',
+  'automation.run_retried': 'retried a failed automation run',
 };
 
 /** Human-readable sentence for an audit action code (falls back to the code itself). */

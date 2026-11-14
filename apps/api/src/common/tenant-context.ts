@@ -10,6 +10,8 @@ export interface RequestContext {
   permissions?: readonly Permission[];
   ip?: string;
   userAgent?: string;
+  /** Set while an automation run executes an action: changes made then carry the run's loop depth (Phase 13). */
+  automation?: { runId: string; workflowId: string; depth: number };
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();

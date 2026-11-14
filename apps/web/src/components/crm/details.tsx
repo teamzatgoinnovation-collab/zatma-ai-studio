@@ -15,6 +15,7 @@ import { CompanySheet, ContactSheet, LeadSheet } from './forms';
 import { DealPanel } from './pipeline';
 import { describeError, OwnerChip, Tags, useCrmAccess } from './shared';
 import { DraftMessageDialog, LeadInsightsCard, LeadScoreCard, ScoreBadge } from './scoring';
+import { RecordAutomations } from '@/components/automation/record-automations';
 import { ActivityComposer, Timeline } from './timeline';
 
 function NotFoundOr({ error, what, onRetry }: { error: unknown; what: string; onRetry: () => void }) {
@@ -284,6 +285,7 @@ export function LeadDetail({ id }: { id: string }) {
                 <LeadInsightsCard lead={l} />
               </div>
             )}
+            <RecordAutomations entityId={l.id} />
             {!converted && <ActivityComposer link={{ leadId: l.id }} canWrite={access.canWrite} />}
             <h2 className="text-lg font-semibold">Activity</h2>
             {timeline.isPending ? <Skeleton className="h-32" /> : <Timeline activities={timeline.data?.activities ?? []} canWrite={access.canWrite && !converted} emptyText="No calls, messages or notes yet." />}
