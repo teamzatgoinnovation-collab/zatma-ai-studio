@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AdInsightPoint } from '@zatma/validation';
 import { money } from './shared';
 
@@ -16,11 +16,18 @@ function ticks(max: number): number[] {
   return Array.from({ length: 5 }, (_, i) => i * step);
 }
 
+export interface DailyPoint {
+  date: string;
+  value: number;
+  /** Tooltip / accessible detail lines after the headline value */
+  detail?: string;
+}
+
 /**
- * Daily spend as columns (one series: no legend, the title names it). Each column is a hover/focus target with a
+ * Daily values as columns (one series: no legend, the title names it). Each column is a hover/focus target with a
  * tooltip; marks follow the shared spec: ≤ 24 px wide, 4 px rounded top, square at the baseline, 2 px gaps, hairline grid.
  */
-export function SpendChart({ days, currency }: { days: AdInsightPoint[]; currency: string }) {
+export function DailyColumns({ days, name, format }: { days: DailyPoint[]; name: string; format: (v: number) => string }) {
   const [hover, setHover] = useState<number | null>(null);
   // Render at the real pixel width so marks and text keep their specified sizes (no viewBox scaling).
   const box = useRef<HTMLDivElement>(null);
@@ -32,8 +39,8 @@ export function SpendChart({ days, currency }: { days: AdInsightPoint[]; currenc
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const values = days.map((d) => Number(d.spend));
-  const axis = useMemo(() => ticks(Math.max(0, ...values)), [values]);
+  const values = days.map((d) => d.value);
+  const axis = ticks(Math.max(0, ...values));
   const top = axis.at(-1)!;
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
@@ -41,7 +48,7 @@ export function SpendChart({ days, currency }: { days: AdInsightPoint[]; currenc
   const barW = Math.max(2, Math.min(24, band - 2));
   const y = (v: number) => PAD.top + innerH - (v / top) * innerH;
   const fmtAxis = (v: number) => new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
-  const label = (d: AdInsightPoint) => new Date(`${d.date}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const label = (d: DailyPoint) => new Date(`${d.date}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
   const h = hover !== null ? days[hover] : null;
   // Date labels at least ~64 px apart; the last day is labelled only when it doesn't crowd the previous label.
   const every = Math.max(1, Math.ceil(64 / band));
@@ -49,7 +56,7 @@ export function SpendChart({ days, currency }: { days: AdInsightPoint[]; currenc
 
   return (
     <div className="relative" ref={box}>
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block max-w-full" role="group" aria-label={`Daily spend, ${days.length} days. Each column can be focused for its values.`}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block max-w-full" role="group" aria-label={`${name}, ${days.length} days. Each column can be focused for its values.`}>
         {axis.map((t) => (
           <g key={t}>
             <line x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} className="stroke-border" strokeWidth={1} />
@@ -59,9 +66,8 @@ export function SpendChart({ days, currency }: { days: AdInsightPoint[]; currenc
           </g>
         ))}
         {days.map((d, i) => {
-          const v = Number(d.spend);
           const x = PAD.left + i * band + (band - barW) / 2;
-          const yy = y(v);
+          const yy = y(d.value);
           const bh = Math.max(0, PAD.top + innerH - yy);
           const r = Math.min(4, barW / 2, bh);
           const path = bh > 0 ? `M${x},${PAD.top + innerH} V${yy + r} Q${x},${yy} ${x + r},${yy} H${x + barW - r} Q${x + barW},${yy} ${x + barW},${yy + r} V${PAD.top + innerH} Z` : '';
@@ -77,7 +83,7 @@ export function SpendChart({ days, currency }: { days: AdInsightPoint[]; currenc
                 fill="transparent"
                 tabIndex={0}
                 role="button"
-                aria-label={`${label(d)}: ${money(d.spend, currency)} spent, ${d.clicks} clicks`}
+                aria-label={`${label(d)}: ${format(d.value)}${d.detail ? `, ${d.detail}` : ''}`}
                 onPointerEnter={() => setHover(i)}
                 onPointerLeave={() => setHover(null)}
                 onFocus={() => setHover(i)}
@@ -103,12 +109,23 @@ export function SpendChart({ days, currency }: { days: AdInsightPoint[]; currenc
           style={{ left: `${Math.min(80, Math.max(0, ((PAD.left + hover * band) / W) * 100))}%` }}
         >
           <p className="font-medium">{label(h)}</p>
-          <p>Spend {money(h.spend, currency)}</p>
-          <p className="text-muted-foreground">
-            {h.impressions.toLocaleString('en-IN')} impressions · {h.clicks.toLocaleString('en-IN')} clicks{h.leads ? ` · ${h.leads} leads` : ''}
+          <p>
+            {name} {format(h.value)}
           </p>
+          {h.detail && <p className="text-muted-foreground">{h.detail}</p>}
         </div>
       )}
     </div>
+  );
+}
+
+/** Daily ad spend for one campaign. */
+export function SpendChart({ days, currency }: { days: AdInsightPoint[]; currency: string }) {
+  return (
+    <DailyColumns
+      name="Spend"
+      format={(v) => money(v.toFixed(2), currency)}
+      days={days.map((d) => ({ date: d.date, value: Number(d.spend), detail: `${d.impressions.toLocaleString('en-IN')} impressions · ${d.clicks.toLocaleString('en-IN')} clicks${d.leads ? ` · ${d.leads} leads` : ''}` }))}
+    />
   );
 }

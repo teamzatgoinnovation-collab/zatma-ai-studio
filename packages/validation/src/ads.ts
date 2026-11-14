@@ -202,6 +202,8 @@ export const campaignDraftSchema = z
     startAt: z.iso.datetime({ offset: true }).nullable().optional(),
     endAt: z.iso.datetime({ offset: true }).nullable().optional(),
     adGroups: z.array(adGroupSchema).min(1).max(5),
+    /** Marketing campaign this ad campaign belongs to (Phase 12) */
+    marketingCampaignId: z.uuid().nullable().optional(),
   })
   .strict();
 export type CampaignDraftInput = z.infer<typeof campaignDraftSchema>;
@@ -389,6 +391,7 @@ export interface AdCampaignDto {
   objective: AdObjective;
   status: CampaignStatus;
   source: 'CREATED' | 'IMPORTED';
+  marketingCampaignId: string | null;
   budgetType: BudgetType;
   budgetAmount: string;
   currency: string;

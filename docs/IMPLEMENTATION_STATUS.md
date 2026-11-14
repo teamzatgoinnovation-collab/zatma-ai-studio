@@ -13,8 +13,8 @@
 | 8 | AI lead scoring & intelligence | ✅ Completed |
 | 9 | Social media account integration | ✅ Completed (real accounts need app keys) |
 | 10 | Social publishing & content calendar | ✅ Completed (live posting needs platform keys and App Review) |
-| 11 | Ads manager (Meta + Google Ads) | ✅ Completed (awaiting approval for Phase 12; live use needs Marketing API access and a Google Ads developer token) |
-| 12 | Campaign management | ⏳ Pending |
+| 11 | Ads manager (Meta + Google Ads) | ✅ Completed (live use needs Marketing API access and a Google Ads developer token) |
+| 12 | Campaign management | ✅ Completed (awaiting approval for Phase 13; Meta lead import needs `leads_retrieval` approval) |
 | 13 | Marketing automation | ⏳ Pending |
 | 14 | Email & WhatsApp marketing | ⏳ Pending |
 | 15 | Landing pages & lead capture | ⏳ Pending |
@@ -966,10 +966,107 @@ See `API_DOCUMENTATION.md` → Phase 11 endpoints. New env: `GOOGLE_ADS_CLIENT_I
 * **Not built yet:**
   * Google Display, Video and Performance Max.
   * Meta video ads and carousels.
-  * Automatic import of Meta lead-form leads into the CRM (Phase 13, `leads_retrieval`).
+  * Automatic import of Meta lead-form leads into the CRM (done in Phase 12).
   * Conversion tracking (Pixel / CAPI, Google conversions).
 * **Spend cap scope:** the cap counts recorded spend plus the committed maximum of campaigns activated in ZatGo. Campaigns activated directly on the platform are mirrored, and they count once their status syncs.
 * **Insights** are as fresh as the hourly sync, and platforms may revise recent days. The nightly 30-day sync re-reads them.
 
 ### Next phase
 **Phase 12: Campaign management.** Multi-channel campaigns that group organic posts, ads, budgets, audiences and leads, with schedule, assets and conversion tracking across channels.
+
+## Phase 12: Campaign management (✅ Completed)
+
+### Features implemented
+* **Campaigns** (`/marketing/campaigns`), with the 9 types from the brief:
+  * Social, Meta Ads, Google Ads, Email, WhatsApp, Product promotion, Festival, Lead generation, Customer retention.
+  * Fields: code (`CMP-0001`), name, type, objective, description, owner, dates and time zone, total budget and currency, channels, audience, UTM slug.
+  * The type pre-selects its channels.
+* **Planning status:**
+  * Draft → (mark ready) → Scheduled / Active / Completed follow the dates; Paused and Cancelled are set by people.
+  * An hourly sweeper keeps the stored status current for filters and plan usage.
+  * **No status change starts spend.**
+  * Pause/cancel can pause the linked running ads and return scheduled posts to drafts, reported item by item.
+  * Resume lists the paused ads with "Review & activate" links into the Phase 11 spend approval.
+* **Channel plans:** budget, notes and dated content items for each channel. Email and WhatsApp are planned now and marked "Sending available in Phase 14"; nothing is shown as sent.
+* **Budget:**
+  * The channel split is checked against the total.
+  * Spend comes from linked ad campaigns, per currency (never summed across currencies), with a budget meter.
+* **Audience:** a description, locations, ages and interests, plus an optional CRM segment (leads or customers by status, source, tags, city, minimum score) with a live count.
+* **Content:**
+  * Link existing posts and ad campaigns, or create new ones from the campaign (the composer and ad builder carry the campaign).
+  * Assets tab for designs and saved copy; tasks and milestones.
+* **Calendars:** month view per campaign and across all campaigns, showing campaign spans, posts, ad flights, planned content and tasks.
+* **Conversion tracking:**
+  * Tracked short links (`/r/{slug}`) with UTM parameters, click and unique counts, copy and QR (SVG download).
+  * Leads attributed by `utm_campaign`, from Meta lead forms (imported automatically every 15 minutes), or by hand (first touch is kept).
+  * Converting a lead carries the campaign to its deal; won deals and their value count as conversions.
+* **Analytics:**
+  * Tiles: leads, won deals and value, link clicks, ad spend, lead → won, posts published, platform conversions.
+  * Daily columns for leads, link clicks or ad spend (one series at a time, with a table view).
+  * By-channel table and leads by source.
+* **AI planner:** from a brief it drafts the type, objective, channels, an exact budget split, the audience, dated content ideas and tasks. Nothing is saved until the user saves.
+* **Elsewhere:**
+  * Lead detail shows the campaign and UTM.
+  * Activity feed labels.
+  * Marketing → Campaigns is live in the nav.
+  * New plan limit `campaigns`.
+
+### Database changes
+Migration `20261112063000_phase12_campaigns`:
+* Tables `campaign`, `campaign_channel_plan`, `campaign_asset`, `campaign_task`, `tracked_link` and `tracked_link_click_daily` (tenant-scoped); enum `MarketingCampaignStatus`.
+* Foreign keys to campaigns from `social_post`, `copy_asset` (existing dangling values cleared first), `design`, `lead`, `deal` and `ad_campaign.marketingCampaignId`.
+* `lead.utm`, `lead.externalRef` (unique per org).
+* Plan limits gained `campaigns`.
+
+### APIs
+See `API_DOCUMENTATION.md` → Phase 12 endpoints. No new environment variables. The web app proxies `/r/:slug` to the API. Meta Ads now also requests `leads_retrieval`.
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Validation unit | ✅ 68 passed (13 new) |
+| API unit | ✅ 116 passed (4 new) |
+| API e2e | ✅ 127 passed (9 new) |
+| Web unit | ✅ 66 passed (2 new) |
+| Lint, typecheck, build | ✅ |
+
+**Validation:** status derivation at every boundary, readiness issues, UTM slugs (accents, other scripts), tracked URLs keep query and fragment, exact budget split, schema rules, PATCH without defaults.
+
+**API unit:** Meta lead-form mapping, per-currency sums, slug alphabet, and `GET /{ad_id}/leads` with the time filter and paging against a fake `fetch`.
+
+**API e2e:**
+* Codes, type defaults, budget-split check and plan usage; status from dates and the sweeper.
+* Same-workspace linking and tenant isolation.
+* **Pause pauses ads and unschedules posts; resume and cancel never activate** (asserted on the fake platform's call log); permission checks per item.
+* Tracked links: 302 with UTM, uniques, bots not counted, 404s, no visitor data stored.
+* UTM attribution and first touch; deal carries the campaign; analytics totals; Sales Agents see only their own leads.
+* Idempotent Meta lead import with duplicate handling and a watermark.
+* Assets, tasks, audience preview and calendar; AI plan with an exact split and nothing saved.
+
+**Browser run** (Playwright, production build, real workers, local stand-ins for Meta and an AI model): **42 checks passed with no console errors.**
+* AI-drafted Festival campaign: ₹50,000 split exactly 35,000 / 10,000 / 5,000; WhatsApp marked for Phase 14; nothing saved before Create.
+* Marked ready → Scheduled; two AI tasks created.
+* A post and two Meta ads linked; the Owner activated one with the spend confirmation.
+* A tracked link clicked from a phone browser landed on the destination with UTM; 2 clicks, 1 unique.
+* A UTM lead was attributed, and the Meta lead form imported 2 leads once.
+* Analytics, calendar and QR shown.
+* Pause sent only PAUSED to Meta and unscheduled the post; resume sent nothing and linked to the spend approval.
+* axe found no serious or critical violations on 13 screens (light and dark).
+* No horizontal scroll on mobile.
+
+**Found and fixed during the run:**
+* The shared `Alert` used `text-destructive` on its tinted background (4.1:1 contrast). It now uses the `destructive-text` token, which fixes every error alert in the app.
+* Informational notices were using the error tone.
+* The link form rejected hosts without a dot.
+* A "% of clicks became leads" hint could exceed 100% because leads also come from forms and ads, so it was removed from the UI.
+* The local Meta stand-in gained the Page-token and lead-form endpoints the adapter already called.
+
+### Remaining issues / notes
+* **Live platforms:** Meta lead import needs `leads_retrieval` in App Review; existing Meta Ads connections must be reconnected once to grant it.
+* **Email and WhatsApp campaigns** are planning-only until Phase 14 (sending, consent, templates).
+* **Attribution is first touch** and campaign-level. Multi-touch and website conversion events (pixel / CAPI, Google conversions) are not built; Phase 17 analytics can extend this.
+* **Unique clicks** are a 24-hour estimate per link (IP + user agent, hashed, not stored), not a person count.
+* Spend in analytics is as fresh as the hourly ads sync.
+
+### Next phase
+**Phase 13: Marketing automation.** A visual trigger → condition → action workflow builder (new lead, status change, form submission, campaign interaction, follow-up overdue, inactive customer, deal won/lost), with execution logs and loop prevention.

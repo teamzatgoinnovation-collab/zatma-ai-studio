@@ -326,3 +326,29 @@ Uploads: `POST /storage/uploads` accepts `purpose: POST_MEDIA` for JPEG, PNG, We
 | GET | `/ads/campaigns/:id/insights?from=YYYY-MM-DD&to=YYYY-MM-DD` | `ads:read` | `{ currency, totals: { impressions, reach, clicks, spend, leads, conversions, ctr, cpc, cpm }, daily[] }` |
 
 Other errors: `ADS_PROVIDER_NOT_CONFIGURED` (503), `ADS_REAUTH_REQUIRED` (409), `ADS_PROVIDER_ERROR` (502), `CAMPAIGN_INVALID` (422, with issues), `PAGE_NOT_CONNECTED`, `ACCOUNT_NOT_IN_WORKSPACE`, `SPEND_APPROVAL_REQUIRED` (403).
+
+## Phase 12 endpoints
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET / POST | `/campaigns[?type&status&channel&ownerId&workspaceId&q&from&to]` | `campaign:read` / `campaign:write` | List (search by name or `CMP-0001`) / create `{ workspaceId, name, type, objective?, description?, ownerId?, startAt?, endAt?, timezone?, budgetAmount?, currency?, channels?, channelPlans?, audience?, utmCampaign? }` (plan limit `campaigns`, 402; 422 `BUDGET_SPLIT_EXCEEDS_TOTAL`) |
+| GET / PATCH / DELETE | `/campaigns/:id` | read / write | PATCH leaves omitted fields unchanged; 409 `CAMPAIGN_CANCELLED`. Delete unlinks content and disables links |
+| POST | `/campaigns/:id/ready` | `campaign:write` | `{ ready }`. 422 `CAMPAIGN_NOT_READY` with `issues[]` |
+| POST | `/campaigns/:id/pause`, `/cancel` | `campaign:write` | `{ pauseAds?, unschedulePosts? }` → `{ campaign, ads[], posts[] }` with per-item `ok` / `error`. Pausing ads needs `ads:manage`; unscheduling needs `social:publish` |
+| POST | `/campaigns/:id/resume` | `campaign:write` | → `{ campaign, pausedAds[] }`. **Never activates ads** |
+| POST | `/campaigns/:id/attach` | `campaign:write` (+ `crm:write` for leads/deals) | `{ kind: post \| ad_campaign \| design \| copy \| lead \| deal, ids[], detach? }`. Same workspace only (422 `LINK_INVALID`) |
+| GET | `/campaigns/:id/content` | `campaign:read` | Linked posts and ad campaigns with status and spend |
+| GET | `/campaigns/:id/leads?page&pageSize` | `campaign:read` + `crm:read` | Attributed leads (record ownership applies) |
+| GET | `/campaigns/:id/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD` | `campaign:read` | Totals (link clicks, uniques, leads, won deals and value per currency, ad spend per currency, impressions, platform leads/conversions, posts published, rates), daily series, leads by source, per-channel breakdown |
+| GET | `/campaigns/calendar?from&to&workspaceId?&campaignId?` | `campaign:read` | Campaign spans, posts, ad flights, tasks and planned content (≤ 62 days) |
+| POST | `/campaigns/audience/preview` | `campaign:read` + `crm:read` | Segment → `{ total, withEmail, withPhone, sample[] }` |
+| POST | `/campaigns/ai/plan` | `campaign:write` + `ai:generate` | `{ brief, type?, totalBudget?, startAt?, endAt?, language?, brandKitId? }` → `{ draft, tasks[], rationale }` with an exact budget split. **Nothing is saved.** Metered as AI purpose `campaigns` |
+| GET / POST / DELETE | `/campaigns/:id/assets[/:assetId]` | read / write | `{ fileId \| designId \| copyAssetId, label? }` |
+| GET / POST / PATCH / DELETE | `/campaigns/:id/tasks[/:taskId]` | read / write | `{ title, dueAt?, assigneeId?, done? }` |
+| GET / POST / PATCH / DELETE | `/campaigns/:id/links[/:linkId]` | read / write | `{ destinationUrl, label?, channel?, utmSource?, utmMedium?, utmContent?, utmTerm? }` → `{ slug, shortUrl, trackedUrl, clicks, uniqueClicks }` |
+| GET | `/r/:slug` | public (120/min per IP) | 302 to the destination with UTM parameters; 404 page for unknown or deleted links |
+
+Changes to existing endpoints:
+* `POST /social/posts` and `PATCH /social/posts/:id` accept `campaignId`.
+* `POST /ads/campaigns` and `PATCH /ads/campaigns/:id` accept `marketingCampaignId`.
+* `POST /crm/leads` accepts `utm` and `campaignId`; lead responses include `campaign` and `utm`.

@@ -239,3 +239,18 @@ On the web, the composer validates live with the shared `validatePost` (`package
 * **Creation:** jobs call `createCampaign` (always PAUSED) and save each created id to `syncState`, so retries resume.
 * **Spend decisions:** `activate` and `changeBudget` run only in request handlers with `ads:approve`, a confirmed `maxSpend` (recomputed by the server) and the cap check. They write `ad_approval`, audit and email.
 * **Sync:** hourly (3 days) and nightly (30 days). It imports external campaigns, mirrors platform status, and upserts `ad_insight_daily`. It never activates.
+
+## Campaigns (Phase 12)
+
+* **Module:** `apps/api/src/campaigns/`:
+  * `CampaignsService`: CRUD, planning status, pause/cancel/resume, linking.
+  * `CampaignTrackingService`: tracked links and the public redirect.
+  * `CampaignInsightsService`: analytics, calendar, audience preview, campaign leads.
+  * `CampaignAssetsService`: assets, tasks, AI planner.
+  * `CampaignsWorkerService`: the `campaigns` queue.
+* **Status:** `deriveStatus` (shared, pure) computes Draft / Scheduled / Active / Completed from `readyAt` and the dates; `manualStatus` overrides it with Paused / Cancelled. The stored `status` is written on every change and refreshed hourly by the sweeper, so lists and plan usage can filter on it.
+* **Links:** campaigns are referenced by nullable foreign keys on `social_post`, `ad_campaign` (`marketingCampaignId`), `design`, `copy_asset`, `lead` and `deal`. Deleting a campaign unlinks everything and disables its tracked links.
+* **Spend boundary:** the campaigns module may call `AdsService.pause` and `PublishingService.cancel`, never activation or budget changes.
+* **Attribution:** `LeadsService.create` sets `campaignId` from an explicit id or a matching `utm.campaign` (first touch). Converting a lead carries the campaign to its deal; won deals are conversions.
+* **Queue `campaigns`:** hourly status sweep, and a Meta lead-form pull every 15 minutes (`GET /{ad_id}/leads` since a per-ad-campaign watermark in `syncState.leadsSince`).
+* **Tracked links:** `GET /api/v1/r/:slug` (public). Clicks are counted with atomic increments on `tracked_link` and `tracked_link_click_daily`; uniqueness uses a 24-hour Redis key.

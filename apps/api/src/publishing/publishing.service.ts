@@ -187,6 +187,7 @@ export class PublishingService {
       publishedAt: r.publishedAt?.toISOString() ?? null,
       sourceDesignId: r.sourceDesignId,
       copyAssetId: r.copyAssetId,
+      campaignId: r.campaignId,
       createdBy: r.createdBy,
       submittedAt: r.submittedAt?.toISOString() ?? null,
       approvedBy: r.approvedBy,
@@ -250,7 +251,8 @@ export class PublishingService {
     });
   }
 
-  private async assertLinks(input: { sourceDesignId?: string | null; copyAssetId?: string | null }) {
+  private async assertLinks(input: { sourceDesignId?: string | null; copyAssetId?: string | null; campaignId?: string | null }) {
+    if (input.campaignId && !(await this.db.campaign.findFirst({ where: { id: input.campaignId, deletedAt: null }, select: { id: true } }))) throw notFound('Campaign');
     if (input.sourceDesignId && !(await this.db.design.findFirst({ where: { id: input.sourceDesignId }, select: { id: true } }))) throw notFound('Design');
     if (input.copyAssetId && !(await this.db.copyAsset.findFirst({ where: { id: input.copyAssetId, deletedAt: null }, select: { id: true } }))) throw notFound('Copy');
   }
@@ -269,6 +271,7 @@ export class PublishingService {
         media: media as unknown as Prisma.InputJsonValue,
         sourceDesignId: input.sourceDesignId ?? null,
         copyAssetId: input.copyAssetId ?? null,
+        campaignId: input.campaignId ?? null,
         createdById: userId,
         targets: { create: targets.map((t) => this.targetData(organizationId, t.account, t.input)) },
       },
@@ -307,6 +310,7 @@ export class PublishingService {
           ...(media ? { media: media as unknown as Prisma.InputJsonValue } : {}),
           ...(input.sourceDesignId !== undefined ? { sourceDesignId: input.sourceDesignId } : {}),
           ...(input.copyAssetId !== undefined ? { copyAssetId: input.copyAssetId } : {}),
+          ...(input.campaignId !== undefined ? { campaignId: input.campaignId } : {}),
           revision: { increment: 1 },
           ...(reapprove ? { approvedAt: null, approvedById: null, ...(p.status === 'SCHEDULED' ? { status: 'DRAFT' as const, scheduledAt: null } : {}) } : {}),
         },
@@ -351,6 +355,7 @@ export class PublishingService {
         media: p.media as Prisma.InputJsonValue,
         sourceDesignId: p.sourceDesignId,
         copyAssetId: p.copyAssetId,
+        campaignId: p.campaignId,
         createdById: userId,
         targets: {
           create: active.map((t) => ({ organizationId, socialAccountId: t.socialAccountId, platform: t.platform, accountName: t.accountName, captionOverride: t.captionOverride, options: t.options as Prisma.InputJsonValue })),

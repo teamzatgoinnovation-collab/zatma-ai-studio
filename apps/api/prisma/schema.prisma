@@ -50,6 +50,9 @@ model User {
   adCampaigns        AdCampaign[]       @relation("AdCampaignCreator")
   activatedCampaigns AdCampaign[]       @relation("AdCampaignActivator")
   adApprovals        AdApproval[]
+  ownedCampaigns     Campaign[]         @relation("CampaignOwner")
+  createdCampaigns   Campaign[]         @relation("CampaignCreator")
+  campaignTasks      CampaignTask[]
 
   @@map("user")
 }
@@ -157,6 +160,12 @@ model Organization {
   adApprovals       AdApproval[]
   invoices          Invoice[]
   payments          Payment[]
+  campaigns         Campaign[]
+  campaignPlans     CampaignChannelPlan[]
+  campaignAssets    CampaignAsset[]
+  campaignTasks     CampaignTask[]
+  trackedLinks      TrackedLink[]
+  trackedLinkDays   TrackedLinkClickDaily[]
 
   @@map("organization")
 }
@@ -209,6 +218,7 @@ model Workspace {
   copyAssets   CopyAsset[]
   socialPosts  SocialPost[]
   adCampaigns  AdCampaign[]
+  campaigns    Campaign[]
 
   @@index([organizationId])
   @@map("workspace")
@@ -376,8 +386,9 @@ model StoredFile {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  uploadedBy   User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy   User?           @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  campaignUses CampaignAsset[]
 
   @@index([organizationId])
   @@map("stored_file")
@@ -548,6 +559,8 @@ model Design {
   thumbnailFileId   String?
   caption           String?
   hashtags          String[]     @default([])
+  /// Campaign this design belongs to (Phase 12)
+  campaignId        String?
   createdById       String?
   deletedAt         DateTime?
   createdAt         DateTime     @default(now())
@@ -559,8 +572,11 @@ model Design {
   createdBy    User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
   versions     DesignVersion[]
   copyAssets   CopyAsset[]
+  campaign     Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignUses CampaignAsset[]
 
   @@index([organizationId, updatedAt])
+  @@index([campaignId])
   @@map("design")
 }
 
@@ -619,21 +635,24 @@ model CopyAsset {
   favorite       Boolean   @default(false)
   brandKitId     String?
   sourceDesignId String?
-  /// Campaign link; foreign key added with campaigns in Phase 12
+  /// Campaign this belongs to (Phase 12)
   campaignId     String?
   createdById    String?
   deletedAt      DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brandKit     BrandKit?    @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
-  sourceDesign Design?      @relation(fields: [sourceDesignId], references: [id], onDelete: SetNull)
-  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brandKit     BrandKit?       @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+  sourceDesign Design?         @relation(fields: [sourceDesignId], references: [id], onDelete: SetNull)
+  createdBy    User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  campaign     Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignUses CampaignAsset[]
 
   @@index([organizationId, updatedAt])
   @@index([organizationId, kind])
+  @@index([campaignId])
   @@map("copy_asset")
 }
 
@@ -773,6 +792,12 @@ model Lead {
   status             LeadStatus @default(NEW)
   source             String     @default("other")
   sourceDetail       String?
+  /// Campaign the lead is attributed to (first touch, Phase 12)
+  campaignId         String?
+  /// { source, medium, campaign, content, term }
+  utm                Json?
+  /// Platform id for imported leads (e.g. "meta:<leadgen id>"), unique per organization
+  externalRef        String?
   notes              String?
   tags               String[]   @default([])
   customFields       Json       @default("{}")
@@ -800,12 +825,15 @@ model Lead {
   convertedContact Contact?     @relation(fields: [convertedContactId], references: [id], onDelete: SetNull)
   activities       Activity[]
   deals            Deal[]
+  campaign         Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
+  @@unique([organizationId, externalRef])
   @@index([organizationId, ownerId])
   @@index([organizationId, status])
   @@index([organizationId, score])
   @@index([organizationId, emailNormalized])
   @@index([organizationId, phoneNormalized])
+  @@index([campaignId])
   @@map("lead")
 }
 
@@ -858,6 +886,7 @@ model Deal {
   expectedCloseAt DateTime?
   closedAt        DateTime?
   source          String?
+  campaignId      String?
   contactId       String?
   companyId       String?
   leadId          String?
@@ -876,10 +905,12 @@ model Deal {
   lead         Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
   owner        User?         @relation("DealOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   activities   Activity[]
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, ownerId])
   @@index([organizationId, status])
   @@index([stageId, position])
+  @@index([campaignId])
   @@map("deal")
 }
 
@@ -1054,7 +1085,7 @@ model SocialPost {
   publishedAt    DateTime?
   sourceDesignId String?
   copyAssetId    String?
-  /// Campaign link; foreign key added with campaigns in Phase 12
+  /// Campaign this belongs to (Phase 12)
   campaignId     String?
   createdById    String?
   submittedAt    DateTime?
@@ -1073,9 +1104,11 @@ model SocialPost {
   createdBy    User?              @relation("PostCreator", fields: [createdById], references: [id], onDelete: SetNull)
   approvedBy   User?              @relation("PostApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   targets      SocialPostTarget[]
+  campaign     Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, status, scheduledAt])
   @@index([organizationId, workspaceId, scheduledAt])
+  @@index([campaignId])
   @@map("social_post")
 }
 
@@ -1165,33 +1198,35 @@ model AdAccount {
 }
 
 model AdCampaign {
-  id               String           @id @default(uuid(7))
-  organizationId   String
-  workspaceId      String
-  adAccountId      String
-  platform         AdPlatform
-  name             String
-  objective        String
-  status           AdCampaignStatus @default(DRAFT)
-  source           String           @default("CREATED")
-  budgetType       AdBudgetType     @default(DAILY)
-  budgetAmount     Decimal          @db.Decimal(14, 2)
-  currency         String
-  startAt          DateTime?
-  endAt            DateTime?
-  externalId       String?
+  id                  String           @id @default(uuid(7))
+  organizationId      String
+  workspaceId         String
+  adAccountId         String
+  platform            AdPlatform
+  name                String
+  /// Marketing campaign this ad campaign belongs to (Phase 12)
+  marketingCampaignId String?
+  objective           String
+  status              AdCampaignStatus @default(DRAFT)
+  source              String           @default("CREATED")
+  budgetType          AdBudgetType     @default(DAILY)
+  budgetAmount        Decimal          @db.Decimal(14, 2)
+  currency            String
+  startAt             DateTime?
+  endAt               DateTime?
+  externalId          String?
   /// Google budget resource name (budget changes)
-  budgetExternalId String?
+  budgetExternalId    String?
   /// Resumable creation progress (ids created so far)
-  syncState        Json             @default("{}")
-  error            String?
-  createdById      String?
-  activatedById    String?
-  activatedAt      DateTime?
-  lastSyncedAt     DateTime?
-  deletedAt        DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  syncState           Json             @default("{}")
+  error               String?
+  createdById         String?
+  activatedById       String?
+  activatedAt         DateTime?
+  lastSyncedAt        DateTime?
+  deletedAt           DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -1201,9 +1236,11 @@ model AdCampaign {
   adGroups     AdGroup[]
   insights     AdInsightDaily[]
   approvals    AdApproval[]
+  campaign     Campaign?        @relation(fields: [marketingCampaignId], references: [id], onDelete: SetNull)
 
   @@unique([adAccountId, externalId])
   @@index([organizationId, status])
+  @@index([marketingCampaignId])
   @@map("ad_campaign")
 }
 
@@ -1302,4 +1339,175 @@ model SocialWebhookEvent {
 
   @@index([provider, receivedAt])
   @@map("social_webhook_event")
+}
+
+// ───────────────────────────── Campaigns (Phase 12) ─────────────────────────────
+
+enum MarketingCampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+/// A multi-channel marketing campaign. Its status is a planning status and never starts any spend.
+model Campaign {
+  id             String                   @id @default(uuid(7))
+  organizationId String
+  workspaceId    String
+  /// Sequence per organization; shown as CMP-0001
+  number         Int
+  name           String
+  type           String
+  objective      String                   @default("AWARENESS")
+  description    String                   @default("")
+  ownerId        String?
+  startAt        DateTime?
+  endAt          DateTime?
+  timezone       String                   @default("Asia/Kolkata")
+  /// Derived from the dates and manualStatus; stored so it can be filtered (recomputed on write and hourly)
+  status         MarketingCampaignStatus  @default(DRAFT)
+  /// PAUSED or CANCELLED when set by a person
+  manualStatus   MarketingCampaignStatus?
+  readyAt        DateTime?
+  budgetAmount   Decimal?                 @db.Decimal(14, 2)
+  currency       String                   @default("INR")
+  channels       String[]                 @default([])
+  /// campaignAudienceSchema (description, notes, CRM segment)
+  audience       Json                     @default("{}")
+  utmCampaign    String
+  createdById    String?
+  deletedAt      DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner        User?                   @relation("CampaignOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy    User?                   @relation("CampaignCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  plans        CampaignChannelPlan[]
+  assets       CampaignAsset[]
+  tasks        CampaignTask[]
+  links        TrackedLink[]
+  linkDays     TrackedLinkClickDaily[]
+  posts        SocialPost[]
+  adCampaigns  AdCampaign[]
+  designs      Design[]
+  copyAssets   CopyAsset[]
+  leads        Lead[]
+  deals        Deal[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status])
+  @@index([organizationId, utmCampaign])
+  @@index([organizationId, startAt])
+  @@map("campaign")
+}
+
+/// Per-channel plan: budget, notes and planned content (how Email/WhatsApp are planned before Phase 14)
+model CampaignChannelPlan {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  campaignId     String
+  channel        String
+  plannedBudget  Decimal? @db.Decimal(14, 2)
+  notes          String   @default("")
+  /// contentPlanItemSchema[]
+  content        Json     @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, channel])
+  @@map("campaign_channel_plan")
+}
+
+/// A file, design or copy collected for the campaign
+model CampaignAsset {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  campaignId     String
+  fileId         String?
+  designId       String?
+  copyAssetId    String?
+  label          String   @default("")
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  file         StoredFile?  @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  design       Design?      @relation(fields: [designId], references: [id], onDelete: Cascade)
+  copyAsset    CopyAsset?   @relation(fields: [copyAssetId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("campaign_asset")
+}
+
+model CampaignTask {
+  id             String    @id @default(uuid(7))
+  organizationId String
+  campaignId     String
+  title          String
+  dueAt          DateTime?
+  done           Boolean   @default(false)
+  assigneeId     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  assignee     User?        @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId, dueAt])
+  @@map("campaign_task")
+}
+
+/// Short link /r/{slug} that redirects to the destination with UTM parameters and counts clicks (no IPs stored)
+model TrackedLink {
+  id             String    @id @default(uuid(7))
+  organizationId String
+  campaignId     String
+  slug           String    @unique
+  destinationUrl String
+  label          String    @default("")
+  channel        String    @default("other")
+  utmSource      String
+  utmMedium      String
+  utmContent     String?
+  utmTerm        String?
+  clicks         Int       @default(0)
+  uniqueClicks   Int       @default(0)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  days         TrackedLinkClickDaily[]
+
+  @@index([campaignId])
+  @@map("tracked_link")
+}
+
+model TrackedLinkClickDaily {
+  id             String   @id @default(uuid(7))
+  organizationId String
+  campaignId     String
+  linkId         String
+  date           DateTime @db.Date
+  clicks         Int      @default(0)
+  uniqueClicks   Int      @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  link         TrackedLink  @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@unique([linkId, date])
+  @@index([campaignId, date])
+  @@map("tracked_link_click_daily")
 }

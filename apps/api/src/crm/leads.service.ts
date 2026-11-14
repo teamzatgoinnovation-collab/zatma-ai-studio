@@ -15,7 +15,7 @@ import { UsageService } from '../billing/usage.service.js';
 import { AppException, notFound } from '../common/errors.js';
 import { paginate } from '../common/pagination.js';
 import { TenantContext } from '../common/tenant-context.js';
-import type { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { contactInclude, CrmContext, dealInclude, leadInclude, ownerScope, searchOr, seesAllRecords, toContactDto, toDealDto, toLeadDto } from './crm-common.js';
 import { PipelineService } from './pipeline.service.js';
@@ -86,16 +86,38 @@ export class LeadsService {
     const organizationId = TenantContext.requireOrganizationId();
     if (!opts.skipLimit) await this.usage.assertWithinLimit(organizationId, 'crmRecords', 1);
     if (!input.allowDuplicate) await this.crm.assertNoDuplicates(input.email, input.phone);
-    const { allowDuplicate: _ignored, ownerId, ...data } = input;
+    const { allowDuplicate: _ignored, ownerId, campaignId, utm, ...data } = input;
     const lead = await this.db.lead.create({
-      data: { ...data, organizationId, ownerId: await this.crm.resolveOwner(ownerId), ...(await this.crm.keys(data.email, data.phone)) },
+      data: {
+        ...data,
+        organizationId,
+        ownerId: await this.crm.resolveOwner(ownerId),
+        ...(await this.crm.keys(data.email, data.phone)),
+        ...(utm ? { utm: utm as Prisma.InputJsonValue } : {}),
+        campaignId: await this.attributeCampaign(campaignId, utm?.campaign),
+      },
     });
     return this.scored(lead.id);
   }
 
+  /**
+   * Campaign for a new lead: an explicit campaign (must exist in the organization), otherwise the campaign whose
+   * UTM slug matches `utm_campaign` (most recently started one if several share it). Null when nothing matches.
+   */
+  async attributeCampaign(explicit: string | null | undefined, utmCampaign: string | undefined): Promise<string | null> {
+    if (explicit) {
+      const c = await this.db.campaign.findFirst({ where: { id: explicit, deletedAt: null }, select: { id: true } });
+      if (!c) throw new AppException(HttpStatus.UNPROCESSABLE_ENTITY, 'CAMPAIGN_NOT_FOUND', 'The campaign does not exist');
+      return c.id;
+    }
+    if (!utmCampaign) return null;
+    const c = await this.db.campaign.findFirst({ where: { utmCampaign: utmCampaign.trim().toLowerCase(), deletedAt: null }, orderBy: [{ startAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }], select: { id: true } });
+    return c?.id ?? null;
+  }
+
   async update(id: string, input: UpdateLeadInput): Promise<LeadDto> {
     const current = await this.getEntity(id);
-    const { ownerId, ...data } = input;
+    const { ownerId, campaignId, utm, ...data } = input;
     const email = data.email !== undefined ? data.email : current.email;
     const phone = data.phone !== undefined ? data.phone : current.phone;
     const lead = await this.db.lead.update({
@@ -104,6 +126,8 @@ export class LeadsService {
         ...data,
         ...(ownerId !== undefined ? { ownerId: await this.crm.resolveOwner(ownerId, current.ownerId) } : {}),
         ...(data.email !== undefined || data.phone !== undefined ? await this.crm.keys(email, phone) : {}),
+        ...(utm !== undefined ? { utm: utm === null ? Prisma.DbNull : (utm as Prisma.InputJsonValue) } : {}),
+        ...(campaignId !== undefined ? { campaignId: campaignId === null ? null : await this.attributeCampaign(campaignId, undefined) } : {}),
       },
     });
     return this.scored(lead.id);
@@ -210,6 +234,7 @@ export class LeadsService {
               contactId: contact.id,
               companyId,
               leadId: lead.id,
+              campaignId: lead.campaignId,
               ownerId: lead.ownerId,
             },
           })

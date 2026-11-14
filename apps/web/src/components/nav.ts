@@ -114,7 +114,7 @@ export const NAV: NavSection[] = [
     icon: Megaphone,
     description: 'Campaigns, social publishing, calendar, email, WhatsApp and automation.',
     children: [
-      { label: 'Campaigns', href: '/marketing/campaigns', phase: 12, description: 'Plan and run multi-channel campaigns.', features: ['Campaign types, budget and audience', 'Assets and schedule', 'Leads and conversion tracking'] },
+      { label: 'Campaigns', href: '/marketing/campaigns', description: 'Plan and run multi-channel campaigns with budget, links, leads and results.', keywords: ['campaign', 'utm', 'tracking', 'festival', 'promotion'] },
       { label: 'Social Accounts', href: '/marketing/accounts', description: 'Connect Facebook Pages, Instagram, LinkedIn Pages and YouTube channels.', keywords: ['connect', 'oauth', 'facebook', 'instagram', 'linkedin', 'youtube'] },
       { label: 'Social Media', href: '/marketing/social', description: 'Compose, preview and publish to connected accounts.', keywords: ['post', 'publish', 'compose', 'schedule'] },
       { label: 'Content Calendar', href: '/marketing/calendar', description: 'Month, week, day and list views of scheduled content.', keywords: ['schedule', 'planner'] },

@@ -77,6 +77,15 @@ export interface InsightRow {
   leads: number;
 }
 
+/** A lead submitted through a platform lead form (Meta instant forms). */
+export interface PlatformLead {
+  externalId: string;
+  createdAt: string;
+  formId: string | null;
+  /** Question key → answer, e.g. { full_name, email, phone_number, city } */
+  fields: Record<string, string>;
+}
+
 export interface CampaignIds {
   campaignId: string;
   budgetId?: string | null;
@@ -104,4 +113,6 @@ export interface AdsPlatformAdapter {
   listCampaigns(ctx: AdsCtx): Promise<ImportedCampaign[]>;
   insights(ctx: AdsCtx, campaignIds: string[], from: string, to: string): Promise<InsightRow[]>;
   searchTargeting(ctx: AdsCtx, kind: 'location' | 'interest' | 'language', q: string): Promise<TargetingOption[]>;
+  /** Leads submitted on the platform for one ad since `since` (read-only). Platforms without lead forms omit it. */
+  listLeads?(ctx: AdsCtx, adId: string, since: Date | null): Promise<PlatformLead[]>;
 }
