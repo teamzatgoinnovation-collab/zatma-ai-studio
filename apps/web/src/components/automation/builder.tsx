@@ -17,6 +17,7 @@ import {
   TRIGGER_INFO,
   TRIGGER_KINDS,
   requiredPermissions,
+  stableStringify,
   validateWorkflow,
   type ActionKind,
   type ConditionKind,
@@ -93,7 +94,7 @@ function Editor({ workflow, ctx, canWrite }: { workflow: WorkflowDto; ctx: FormC
   const graph = toGraph(nodes, edges);
   const issues = validateWorkflow(graph);
   const errors = issues.filter((i) => i.level === 'error');
-  const dirty = JSON.stringify(graph) !== JSON.stringify(workflow.graph) || name.trim() !== workflow.name || description !== workflow.description || JSON.stringify(settings) !== JSON.stringify(workflow.settings);
+  const dirty = stableStringify(graph) !== stableStringify(workflow.graph) || name.trim() !== workflow.name || description !== workflow.description || stableStringify(settings) !== stableStringify(workflow.settings);
   const selected = nodes.find((n) => n.id === selectedId) ?? null;
   const live = workflow.status === 'ACTIVE';
   const outcomes = new Map<string, Outcome>((result?.path ?? []).map((p) => [p.nodeId, p.outcome]));
@@ -183,7 +184,8 @@ function Editor({ workflow, ctx, canWrite }: { workflow: WorkflowDto; ctx: FormC
   }));
   const shownEdges: Edge[] = edges.map((e) => {
     const onPath = outcomes.has(e.source) && outcomes.has(e.target);
-    return { ...e, label: e.sourceHandle === 'yes' ? 'Yes' : e.sourceHandle === 'no' ? 'No' : undefined, animated: onPath, style: onPath ? { stroke: 'var(--color-success)', strokeWidth: 2 } : undefined, labelBgStyle: { fill: 'var(--color-card)' }, labelStyle: { fill: 'var(--color-foreground)', fontSize: 11 } };
+    // Yes / No are labelled on the step itself, so the lines stay clean.
+    return { ...e, animated: onPath, style: onPath ? { stroke: 'var(--color-success)', strokeWidth: 2 } : undefined };
   });
 
   const stepsInOrder = [...nodes].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
@@ -239,7 +241,7 @@ function Editor({ workflow, ctx, canWrite }: { workflow: WorkflowDto; ctx: FormC
           <div className="grid gap-4 xl:grid-cols-[13rem_minmax(0,1fr)_21rem]">
             {canWrite && <Palette onAdd={(t, k) => addStep(t, k)} />}
             <div className="space-y-3 xl:order-none">
-              <div className="h-[34rem] overflow-hidden rounded-2xl border border-border bg-card" aria-label="Workflow canvas. Use the step list below to build without dragging.">
+              <div role="group" className="h-[34rem] overflow-hidden rounded-2xl border border-border bg-card" aria-label="Workflow canvas. Use the step list to build without dragging.">
                 <ReactFlow
                   nodes={shown}
                   edges={shownEdges}
@@ -261,7 +263,7 @@ function Editor({ workflow, ctx, canWrite }: { workflow: WorkflowDto; ctx: FormC
                 >
                   <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} />
                   <Controls showInteractive={false} />
-                  <MiniMap pannable zoomable className="!hidden md:!block" />
+                  <MiniMap pannable zoomable ariaLabel="Overview of the workflow" style={{ width: 110, height: 72 }} className="!hidden 2xl:!block" />
                 </ReactFlow>
               </div>
               <div className="flex flex-wrap items-center gap-2">

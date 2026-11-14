@@ -5,6 +5,7 @@ import {
   nodeLabel,
   parseNodeConfig,
   requiredPermissions,
+  stableStringify,
   TRIGGER_INFO,
   TRIGGER_KINDS,
   validateWorkflow,
@@ -136,7 +137,7 @@ export class AutomationService {
 
   async update(id: string, input: UpdateWorkflowInput): Promise<WorkflowDto> {
     const w = await this.row(id);
-    const graphChanged = input.graph !== undefined && JSON.stringify(input.graph) !== JSON.stringify(w.graph);
+    const graphChanged = input.graph !== undefined && stableStringify(input.graph) !== stableStringify(w.graph);
     const graph = (input.graph ?? w.graph) as unknown as WorkflowGraph;
     const live = w.status === 'ACTIVE' && graphChanged;
     // Changing a running automation is a new activation: it must be valid and the editor must be allowed to run it.

@@ -14,8 +14,8 @@
 | 9 | Social media account integration | ✅ Completed (real accounts need app keys) |
 | 10 | Social publishing & content calendar | ✅ Completed (live posting needs platform keys and App Review) |
 | 11 | Ads manager (Meta + Google Ads) | ✅ Completed (live use needs Marketing API access and a Google Ads developer token) |
-| 12 | Campaign management | ✅ Completed (awaiting approval for Phase 13; Meta lead import needs `leads_retrieval` approval) |
-| 13 | Marketing automation | ⏳ Pending |
+| 12 | Campaign management | ✅ Completed (Meta lead import needs `leads_retrieval` approval) |
+| 13 | Marketing automation | ✅ Completed (customer email / WhatsApp actions arrive with Phase 14) |
 | 14 | Email & WhatsApp marketing | ⏳ Pending |
 | 15 | Landing pages & lead capture | ⏳ Pending |
 | 16 | AI Video Studio | ⏳ Pending |
@@ -1069,4 +1069,91 @@ See `API_DOCUMENTATION.md` → Phase 12 endpoints. No new environment variables.
 * Spend in analytics is as fresh as the hourly ads sync.
 
 ### Next phase
-**Phase 13: Marketing automation.** A visual trigger → condition → action workflow builder (new lead, status change, form submission, campaign interaction, follow-up overdue, inactive customer, deal won/lost), with execution logs and loop prevention.
+Phase 13: Marketing automation (see below).
+
+## Phase 13: Marketing automation (✅ Completed)
+
+### Features implemented
+* **Visual builder** (`/marketing/automation/[id]`) on a React Flow canvas:
+  * A palette of 9 triggers, 8 conditions, 11 actions and a delay; a typed form for each step.
+  * Condition steps branch Yes / No. Live checks list every problem and warning, and highlight the step.
+  * Everything doable by dragging is also doable from the step list and the "What happens next" selects, so it works with a keyboard.
+  * Tidy-up layout, save, activate (a dialog lists the permissions it will run with), pause, delete.
+* **Triggers:** new lead, lead status changed (from / to filters), new customer, form submission (Meta instant forms today), campaign interaction, follow-up overdue, customer inactive (N days), deal won, deal lost. Triggers can filter by source, status, campaign and deal value.
+* **Conditions:** lead score, lead source, customer segment, deal value, industry, tags (any / all / none), campaign engagement, and date (weekdays, a time window that can pass midnight, record age, all in the organization's time zone).
+* **Actions:**
+  * Assign salesperson (one person, or take turns).
+  * Create follow-up task (merge fields in the title), add / remove tag, update lead status.
+  * Notify team and Email team (internal only).
+  * Enrol in campaign (and attribute the lead to it if it has none).
+  * Generate AI message (saved as a note for the owner; nothing is sent).
+  * Wait (minutes to 30 days).
+  * Email the lead and WhatsApp the lead are listed as **"Phase 14"** and cannot be activated.
+* **Test run:** a dry run against a real lead, contact, deal or follow-up. It highlights the path taken and lists what would change, writing, sending and calling AI nothing.
+* **Templates:** the master prompt's hot-Meta-lead example, follow-up overdue → notify the owner, deal won → tag and thank-you task, and inactive customer → AI draft and task.
+* **Run log:**
+  * Per automation, organization-wide, and on lead detail.
+  * Each run expands into its steps with outputs and errors, and a failed run can be retried from its failed step.
+  * A hot lead's run shows assign and call task; a cold lead's shows enrolment.
+* **Safety and limits:**
+  * Runs as the person who activated it, re-checking their permissions on every run (demotion fails the run and pauses it).
+  * Loop prevention (depth 3, no self-restart), per-record cooldown, per-workflow hourly rate, and a monthly plan quota with a once-a-day admin email.
+  * Transient errors retry; permanent errors fail at once with a failure email (at most hourly) and an automatic pause after 10 failures in a row.
+* **Elsewhere:** plan limit `automationRuns` (with usage meter), activity feed labels, Marketing → Automation is live in the nav.
+
+### Database changes
+Migration `20261114080000_phase13_automation`:
+* Tables `automation_workflow`, `automation_run`, `automation_run_step` and `campaign_enrollment` (all tenant-scoped); enums for workflow, run and step status.
+* Plan limits gained `automationRuns`.
+* No new permissions (`automation:read` and `automation:write` already existed).
+
+### APIs
+See `API_DOCUMENTATION.md` → Phase 13 endpoints. No new environment variables. New dependency: `@xyflow/react` 12.12.1 (web).
+
+### Tests and results (all passing)
+| Suite | Result |
+|---|---|
+| Validation unit | ✅ 85 passed (17 new) |
+| API unit | ✅ 122 passed (6 new) |
+| API e2e | ✅ 139 passed (12 new) |
+| Web unit | ✅ 74 passed (8 new) |
+| Lint, typecheck, build | ✅ |
+
+**Validation:** graph rules (one trigger, cycles, branches, dangling edges, Phase 14 actions, 50-node chains), every condition evaluator including time zones and midnight-crossing windows, the merge-field renderer (nothing executes), required permissions, key-order-independent comparison.
+
+**API unit:** trigger filters, round-robin rotation, and which errors are retried.
+
+**API e2e:**
+* Templates, create / edit / delete, and issues on unfinished drafts; version only bumps on real changes.
+* Activation refused for missing permissions, an invalid graph, a Phase 14 action, a person who left, or a cycle.
+* The hot-lead example end to end (rotating owners, call task with merge fields, nurture enrolment, redacted step log); dry run writes nothing.
+* Status-change, deal-won and new-customer triggers, with an AI draft saved as a note and no customer messaging.
+* The scanner for overdue follow-ups and inactive customers (once per occurrence), and the internal email.
+* A delay resumes; a transient error retries (two attempts recorded, the finished step ran once); a permanent error fails the run, sends a failure email, and the run resumes from the failed step only.
+* Loop prevention (ping-pong stops at depth 3, no self-restart), cooldown, hourly rate (logged once).
+* Demoting the owner fails the run and pauses it; editing a running workflow re-checks permissions; pausing stops runs.
+* Tenant isolation; Viewer read-only; quota exhaustion skipped and emailed once.
+
+**Browser run** (Playwright, production build, real workers): **33 checks passed with no console errors.**
+* Built from the template in the UI: chose a person and campaign, set a score threshold from two real leads' scores.
+* Test run: the hot lead took the Yes path and the cold lead the No path; no runs or changes were created.
+* Activated through the permissions dialog; two real leads produced two runs (assignment and call task; campaign enrolment); the run log, the org-wide log and the lead detail page showed them.
+* Pausing stopped new runs; a step was added and removed from the inspector alone.
+* The Phase 14 action was disabled; axe found no serious or critical issues on 11 screens (light and dark); no horizontal scroll on mobile.
+
+**Found and fixed during the run:**
+* Postgres returns stored JSON with its own key order, so "unsaved changes" stayed on after saving and a saved graph looked changed. Comparisons are now key-order independent (editor and API).
+* The canvas wrapper had an accessible name but no role (axe).
+* "Yes" / "No" appeared twice on branches; the minimap covered a step.
+
+### Remaining issues / notes
+* **Email and WhatsApp to leads** are listed but unavailable until Phase 14 (consent, templates, unsubscribe). Enrolled people are stored for Phase 14 to send to.
+* **CSV imports don't start automations** (thousands of rows should not fire thousands of runs).
+* **Tracked-link clicks don't trigger anything:** they are anonymous by design (Phase 12). Campaign interaction means a lead attributed or enrolled.
+* **Form submission** fires for Meta instant forms today; Phase 15 forms will use the same trigger.
+* **Rate and cooldown limits are approximate** when many events for one workflow are processed at the same moment.
+* **Time-based triggers are checked hourly,** and only for follow-ups that became overdue in the last 14 days.
+* Dragging on touch screens works, but the step list and inspector are the easier way to build on a phone.
+
+### Next phase
+**Phase 14: Email & WhatsApp marketing.** Templates, segments and campaigns for email and WhatsApp, with consent and opt-out handling, delivery tracking and CRM sync. The automation actions "Email the lead" and "WhatsApp the lead" switch on here.

@@ -263,6 +263,23 @@ export function nodeLabel(type: NodeType, kind: string): string {
   return 'Wait';
 }
 
+/**
+ * JSON with object keys in sorted order. Postgres stores JSON with its own key order, so comparing a saved graph with a
+ * freshly built one needs a canonical form (otherwise "nothing changed" is reported as a change after every save).
+ */
+export function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .filter((k) => o[k] !== undefined)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stableStringify(o[k])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
 /** Permissions a workflow needs to run (union over its actions), used when activating and again at run time. */
 export function requiredPermissions(graph: WorkflowGraph): string[] {
   const perms = new Set<string>(['automation:write']);

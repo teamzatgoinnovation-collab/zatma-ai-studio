@@ -3,6 +3,7 @@ import {
   evaluateCondition,
   parseNodeConfig,
   renderMerge,
+  stableStringify,
   requiredPermissions,
   unknownMergeFields,
   updateWorkflowSchema,
@@ -133,5 +134,15 @@ describe('schemas', () => {
     expect(r.ok && r.config).toMatchObject({ type: 'FOLLOW_UP', dueInHours: 24, priority: 'MEDIUM', assigneeId: null });
     expect(parseNodeConfig('delay', 'delay', { amount: 0, unit: 'days' }).ok).toBe(false);
     expect(updateWorkflowSchema.parse({ name: 'Renamed' })).toEqual({ name: 'Renamed' });
+  });
+});
+
+describe('stableStringify', () => {
+  it('ignores key order (as stored by Postgres) but not values or array order', () => {
+    expect(stableStringify({ b: 1, a: { d: [1, 2], c: null } })).toBe(stableStringify({ a: { c: null, d: [1, 2] }, b: 1 }));
+    expect(stableStringify({ a: [1, 2] })).not.toBe(stableStringify({ a: [2, 1] }));
+    expect(stableStringify({ a: 1, b: undefined })).toBe(stableStringify({ a: 1 }));
+    expect(stableStringify('x')).toBe('"x"');
+    expect(stableStringify(null)).toBe('null');
   });
 });

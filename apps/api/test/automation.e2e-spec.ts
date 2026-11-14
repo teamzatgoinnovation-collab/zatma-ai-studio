@@ -100,7 +100,11 @@ describe('Marketing automation (e2e)', () => {
     expect((await api(app, viewer).get(`/automations/${w.id}`).expect(200)).body.name).toBe('Hot Meta lead');
     const patched = (await api(app, manager).patch(`/automations/${w.id}`, { name: 'Hot Meta leads' }).expect(200)).body;
     expect(patched).toMatchObject({ name: 'Hot Meta leads', version: 1 });
-    expect((await api(app, manager).patch(`/automations/${w.id}`, { graph: { nodes: [N('t', 'trigger', 'lead.created')], edges: [] } }).expect(200)).body.version).toBe(2);
+    const v2 = (await api(app, manager).patch(`/automations/${w.id}`, { graph: { nodes: [N('t', 'trigger', 'lead.created', { sources: ['meta_ads', 'website'], extra: { z: 1, a: 2 } })], edges: [] } }).expect(200)).body;
+    expect(v2.version).toBe(2);
+    // Saving the same graph again (Postgres hands the JSON back with its own key order) is not a new version.
+    expect((await api(app, manager).patch(`/automations/${w.id}`, { graph: v2.graph, name: 'Hot Meta leads again' }).expect(200)).body.version).toBe(2);
+    expect((await api(app, manager).patch(`/automations/${w.id}`, { graph: { nodes: [N('t', 'trigger', 'lead.created', { extra: { a: 2, z: 1 }, sources: ['meta_ads', 'website'] })], edges: [] } }).expect(200)).body.version).toBe(2);
     expect((await api(app, viewer).get('/automations?q=hot').expect(200)).body.data.map((x: { id: string }) => x.id)).toEqual([w.id]);
     await api(app, manager).delete(`/automations/${w.id}`).expect(204);
     await api(app, manager).get(`/automations/${w.id}`).expect(404);

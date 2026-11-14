@@ -106,11 +106,21 @@ Encrypted columns use AES-256-GCM with the row's identity as associated data (se
 
 New nullable foreign keys (`ON DELETE SET NULL`): `campaignId` on `social_post`, `copy_asset` (these columns existed without a key), `design`, `lead`, `deal`; `marketingCampaignId` on `ad_campaign`. `lead` also gained `utm` (JSON) and `externalRef` (unique per org, e.g. `meta:<lead id>`). Plan limits gained `campaigns` (active campaigns: Free 2, Starter 10, Professional 50, Business 200, Agency unlimited).
 
+## Automation (Phase 13)
+
+| Table | Key fields |
+|---|---|
+| `automation_workflow` ✅ | organizationId, name, description, status (DRAFT / ACTIVE / PAUSED), graph (JSON: nodes and edges), version, triggerKind (indexed for dispatch), settings (JSON: maxRunsPerHour, reentryCooldownMinutes), **ownerId** (the member it runs as: whoever last activated or edited it live), activatedAt, pausedReason, consecutiveFailures, lastFailureEmailAt, createdById, deletedAt |
+| `automation_run` ✅ | workflowId, version, **graphSnapshot** (the version that started it), triggerKind, entityType / entityId, payload (small redacted facts), **dedupeKey** (unique per workflow: the same event never starts it twice), status (RUNNING / WAITING / SUCCEEDED / FAILED / SKIPPED / CANCELLED), skipReason, depth (loop level), resumeNodeId, error, startedAt, finishedAt |
+| `automation_run_step` ✅ | runId, nodeId, nodeType, kind, label, status (SUCCEEDED / FAILED / SKIPPED / WAITING), attempts, output (JSON: ids and counts, never message bodies or contact details), error. Unique (run, node): a retry never repeats a completed step |
+| `campaign_enrollment` ✅ | campaignId, leadId or contactId, source (automation / manual), workflowId. Unique (campaign, lead) and (campaign, contact). Phase 14 sends to enrolled people |
+
+Plan limits gained `automationRuns` per UTC month (Free 100, Starter 2,000, Professional 10,000, Business 50,000, Agency unlimited). Skipped runs don't count.
+
 ## Marketing, social & ads (planned)
 
 | Table | Phase | Key fields |
 |---|---|---|
-| `automation`, `automation_node`, `automation_run`, `automation_run_step` | P13 | graph JSON, trigger, run logs |
 | `email_template`, `email_campaign`, `email_event` | P14 | |
 | `whatsapp_template`, `whatsapp_message` | P14 | |
 | `landing_page`, `form`, `form_submission` | P15 | |
