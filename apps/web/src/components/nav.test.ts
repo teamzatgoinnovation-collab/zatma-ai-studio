@@ -16,7 +16,7 @@ describe('navigation config', () => {
   });
 
   it('marks live modules without a phase and planned ones with one', () => {
-    const live = ['/dashboard', '/studio', '/studio/design', '/studio/posters', '/studio/templates', '/studio/brand-kit', '/studio/copywriter', '/crm', '/crm/leads', '/crm/contacts', '/crm/companies', '/crm/customers', '/crm/deals', '/crm/pipeline', '/crm/activities', '/crm/follow-ups', '/marketing', '/marketing/accounts', '/marketing/social', '/marketing/calendar', '/ads', '/ads/meta', '/ads/google', '/ads/campaigns', '/team', '/billing', '/settings'];
+    const live = ['/dashboard', '/studio', '/studio/design', '/studio/posters', '/studio/templates', '/studio/brand-kit', '/studio/copywriter', '/crm', '/crm/leads', '/crm/contacts', '/crm/companies', '/crm/customers', '/crm/deals', '/crm/pipeline', '/crm/activities', '/crm/follow-ups', '/marketing', '/marketing/campaigns', '/marketing/accounts', '/marketing/social', '/marketing/calendar', '/ads', '/ads/meta', '/ads/google', '/ads/campaigns', '/team', '/billing', '/settings'];
     for (const href of live) expect(findNavEntry(href), href).toBeTruthy();
     for (const e of allNavEntries().filter((e) => live.includes(e.href))) expect(e.phase, e.href).toBeUndefined();
     for (const e of allNavEntries().filter((e) => !live.includes(e.href))) {

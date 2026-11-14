@@ -155,6 +155,8 @@ const postFields = {
   targets: z.array(postTargetInputSchema).max(25).default([]),
   sourceDesignId: uuid.nullable().optional(),
   copyAssetId: uuid.nullable().optional(),
+  /** Marketing campaign the post belongs to (Phase 12) */
+  campaignId: uuid.nullable().optional(),
 };
 
 export const createPostSchema = z.object({ workspaceId: uuid, ...postFields }).strict();
@@ -170,6 +172,7 @@ export const updatePostSchema = z
     targets: z.array(postTargetInputSchema).max(25).optional(),
     sourceDesignId: postFields.sourceDesignId,
     copyAssetId: postFields.copyAssetId,
+    campaignId: postFields.campaignId,
   })
   .strict();
 export type UpdatePostInput = z.infer<typeof updatePostSchema>;
@@ -397,6 +400,7 @@ export interface SocialPostDto {
   publishedAt: string | null;
   sourceDesignId: string | null;
   copyAssetId: string | null;
+  campaignId: string | null;
   createdBy: PersonRef | null;
   submittedAt: string | null;
   approvedBy: PersonRef | null;

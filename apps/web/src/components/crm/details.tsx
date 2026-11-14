@@ -234,6 +234,21 @@ export function LeadDetail({ id }: { id: string }) {
               {SOURCE_LABELS[l.source]}
               {l.sourceDetail ? ` · ${l.sourceDetail}` : ''}
             </Field>
+            <Field label="Campaign">
+              {l.campaign && (
+                <Link href={`/marketing/campaigns/${l.campaign.id}`} className="text-primary hover:underline">
+                  {l.campaign.name} ({l.campaign.code})
+                </Link>
+              )}
+            </Field>
+            {l.utm && (
+              <Field label="UTM">
+                {Object.entries(l.utm)
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(' · ')}
+              </Field>
+            )}
             <Field label="Industry">{l.industry}</Field>
             <Field label="Location">{[l.city, l.country].filter(Boolean).join(', ') || null}</Field>
             <Field label="Owner">

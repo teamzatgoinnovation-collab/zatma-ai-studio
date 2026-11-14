@@ -4,8 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, AlertTriangle, Check, ImagePlus, Loader2, Plus, Search, Sparkles, Upload, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, cn, Dialog, DialogContent, Input, Label, Select, Skeleton } from '@zatma/ui';
 import {
@@ -121,8 +121,12 @@ function toRequest(s: State, platform: 'META' | 'GOOGLE'): CampaignDraftRequest 
   };
 }
 
+const campaignParam = (value: string | null, editing: boolean) => (!editing && value && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined);
+
 export function CampaignBuilder({ campaign }: { campaign?: AdCampaignDto }) {
   const router = useRouter();
+  // Opened from a marketing campaign (Phase 12): the new ad campaign is linked to it.
+  const marketingCampaignId = campaignParam(useSearchParams().get('campaign'), !!campaign);
   const qc = useQueryClient();
   const now = useNow();
   const org = useQuery({ queryKey: ['organization', 'current'], queryFn: api.organizations.current });
@@ -185,7 +189,7 @@ export function CampaignBuilder({ campaign }: { campaign?: AdCampaignDto }) {
   const save = useMutation({
     mutationFn: async (andCreate: boolean) => {
       const { workspaceId, adAccountId, ...changes } = req;
-      const saved = campaign ? await api.ads.campaigns.update(campaign.id, changes) : await api.ads.campaigns.create({ ...changes, workspaceId, adAccountId });
+      const saved = campaign ? await api.ads.campaigns.update(campaign.id, changes) : await api.ads.campaigns.create({ ...changes, workspaceId, adAccountId, ...(marketingCampaignId ? { marketingCampaignId } : {}) });
       return andCreate ? api.ads.campaigns.publish(saved.id) : saved;
     },
     onSuccess: async (dto, andCreate) => {
@@ -196,28 +200,25 @@ export function CampaignBuilder({ campaign }: { campaign?: AdCampaignDto }) {
     onError: (e) => toast.error(errorText(e)),
   });
 
-  const onRendered = useCallback(
-    async (blob: Blob) => {
-      const r = rendering;
-      setRendering(null);
-      if (!r) return;
-      setUploading(true);
-      try {
-        const file = new File([blob], `${r.design.title || 'design'}.jpg`, { type: 'image/jpeg' });
-        const fileId = await uploadFile(file, 'POST_MEDIA');
-        setS((x) => ({ ...x, ads: x.ads.map((a, i) => (i === r.adIndex ? { ...a, imageFileId: fileId, imageWidth: r.design.width, imageHeight: r.design.height, imageUrl: URL.createObjectURL(file), sourceDesignId: r.design.id } : a)) }));
-      } catch (e) {
-        toast.error(errorText(e));
-      } finally {
-        setUploading(false);
-      }
-    },
-    [rendering],
-  );
-  const onRenderError = useCallback((e: Error) => {
+  const onRendered = async (blob: Blob) => {
+    const r = rendering;
+    setRendering(null);
+    if (!r) return;
+    setUploading(true);
+    try {
+      const file = new File([blob], `${r.design.title || 'design'}.jpg`, { type: 'image/jpeg' });
+      const fileId = await uploadFile(file, 'POST_MEDIA');
+      setS((x) => ({ ...x, ads: x.ads.map((a, i) => (i === r.adIndex ? { ...a, imageFileId: fileId, imageWidth: r.design.width, imageHeight: r.design.height, imageUrl: URL.createObjectURL(file), sourceDesignId: r.design.id } : a)) }));
+    } catch (e) {
+      toast.error(errorText(e));
+    } finally {
+      setUploading(false);
+    }
+  };
+  const onRenderError = (e: Error) => {
     setRendering(null);
     toast.error(`Could not render the design: ${e.message}`);
-  }, []);
+  };
 
   if (accounts.isPending || org.isPending || workspaces.isPending) return <Skeleton className="h-96" />;
   if (!accounts.data?.length)

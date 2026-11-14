@@ -2,10 +2,10 @@ import { createHmac } from 'node:crypto';
 import { toMetaMinor, fromMetaMinor, type AdObjective, type MetaCreative, type MetaTargeting, type TargetingOption } from '@zatma/validation';
 import { MetaProvider, type MetaConfig } from '../../social/providers/meta.provider.js';
 import { form, ProviderAuthError, ProviderError, requestJson, type FetchLike } from '../../social/providers/provider.js';
-import type { AdAccountInfo, AdsCtx, AdsPlatformAdapter, CampaignIds, CampaignPlan, CreatedCampaign, ImportedCampaign, InsightRow } from './ads-provider.js';
+import type { AdAccountInfo, AdsCtx, AdsPlatformAdapter, CampaignIds, CampaignPlan, CreatedCampaign, ImportedCampaign, InsightRow, PlatformLead } from './ads-provider.js';
 
 /** Marketing API permissions (plus the Page access needed for ad creatives and lead forms). */
-export const META_ADS_SCOPES = ['ads_management', 'ads_read', 'business_management', 'pages_show_list', 'pages_read_engagement', 'pages_manage_ads'];
+export const META_ADS_SCOPES = ['ads_management', 'ads_read', 'business_management', 'pages_show_list', 'pages_read_engagement', 'pages_manage_ads', 'leads_retrieval'];
 
 const OBJECTIVE: Partial<Record<AdObjective, string>> = { TRAFFIC: 'OUTCOME_TRAFFIC', ENGAGEMENT: 'OUTCOME_ENGAGEMENT', MESSAGES: 'OUTCOME_ENGAGEMENT', AWARENESS: 'OUTCOME_AWARENESS', LEADS: 'OUTCOME_LEADS' };
 const FROM_OBJECTIVE: Record<string, AdObjective> = { OUTCOME_TRAFFIC: 'TRAFFIC', LINK_CLICKS: 'TRAFFIC', OUTCOME_ENGAGEMENT: 'ENGAGEMENT', POST_ENGAGEMENT: 'ENGAGEMENT', MESSAGES: 'MESSAGES', OUTCOME_AWARENESS: 'AWARENESS', REACH: 'AWARENESS', BRAND_AWARENESS: 'AWARENESS', OUTCOME_LEADS: 'LEADS', LEAD_GENERATION: 'LEADS' };
@@ -255,6 +255,22 @@ export class MetaAdsAdapter implements AdsPlatformAdapter {
           leads,
           conversions: leads + act(['onsite_conversion.messaging_conversation_started_7d']),
         });
+      }
+      next = res.paging?.next ?? null;
+    }
+    return out;
+  }
+
+  /** `GET /{ad_id}/leads` (needs `leads_retrieval`), newest first, filtered by time_created and paged. */
+  async listLeads(ctx: AdsCtx, adId: string, since: Date | null): Promise<PlatformLead[]> {
+    const out: PlatformLead[] = [];
+    const params: Record<string, string> = { fields: 'id,created_time,form_id,field_data', limit: '100' };
+    if (since) params.filtering = JSON.stringify([{ field: 'time_created', operator: 'GREATER_THAN', value: Math.floor(since.getTime() / 1000) }]);
+    let next: string | null = this.url(`${adId}/leads`, params, ctx.token);
+    for (let page = 0; next && page < 20; page++) {
+      const res: { data: Array<{ id: string; created_time: string; form_id?: string; field_data?: Array<{ name: string; values?: string[] }> }>; paging?: { next?: string } } = await requestJson(this.fetchImpl, next, { authErrors: metaAuth });
+      for (const l of res.data) {
+        out.push({ externalId: l.id, createdAt: l.created_time, formId: l.form_id ?? null, fields: Object.fromEntries((l.field_data ?? []).map((f) => [f.name.toLowerCase(), (f.values ?? []).join(', ').slice(0, 500)])) });
       }
       next = res.paging?.next ?? null;
     }

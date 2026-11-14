@@ -37,6 +37,8 @@ type TargetState = { captionOverride: string | null; options: TargetOptions };
 export interface ComposerPrefill {
   designId?: string;
   copyId?: string;
+  /** Marketing campaign the new post belongs to (Phase 12) */
+  campaignId?: string;
   at?: string;
 }
 
@@ -125,6 +127,7 @@ export function Composer({ post, prefill }: { post?: SocialPostDto; prefill?: Co
     targets: selected.map((a) => ({ socialAccountId: a.id, captionOverride: targets[a.id]!.captionOverride || null, options: targets[a.id]!.options })),
     sourceDesignId,
     copyAssetId,
+    ...(postId ? {} : prefill?.campaignId ? { campaignId: prefill.campaignId } : {}),
   });
 
   const save = useMutation({

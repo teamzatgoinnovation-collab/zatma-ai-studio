@@ -36,7 +36,7 @@ export class UsageService {
     const periodStart = subscription?.currentPeriodStart ?? new Date(Date.now() - 30 * 24 * 3600 * 1000);
     const month = monthWindow(new Date());
     const inMonth = { gte: month.start, lt: month.end };
-    const [members, pendingInvitations, workspaces, storage, credits, leads, contacts, socialAccounts, posts, adAccounts] = await Promise.all([
+    const [members, pendingInvitations, workspaces, storage, credits, leads, contacts, socialAccounts, posts, adAccounts, campaigns] = await Promise.all([
       db.member.count({ where: { organizationId } }),
       db.invitation.count({ where: { organizationId, status: 'pending', expiresAt: { gt: new Date() } } }),
       db.workspace.count({ where: { organizationId } }),
@@ -56,6 +56,7 @@ export class UsageService {
         },
       }),
       db.adAccount.count({ where: { organizationId } }),
+      db.campaign.count({ where: { organizationId, deletedAt: null, status: { notIn: ['COMPLETED', 'CANCELLED'] } } }),
     ]);
     return {
       members: members + pendingInvitations,
@@ -66,6 +67,7 @@ export class UsageService {
       crmRecords: leads + contacts,
       postsPerMonth: posts,
       adAccounts,
+      campaigns,
     };
   }
 
@@ -107,4 +109,5 @@ export const METRIC_LABELS: Record<UsageMetric, string> = {
   crmRecords: 'CRM contacts and leads',
   postsPerMonth: 'social posts per month',
   adAccounts: 'ad accounts',
+  campaigns: 'active campaigns',
 };

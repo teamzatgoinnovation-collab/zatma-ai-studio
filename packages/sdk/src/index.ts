@@ -113,6 +113,23 @@ import type {
   UpdateOrganizationInput,
   UpdateProfileInput,
   UpdateWorkspaceInput,
+  AiCampaignPlanDto,
+  AiCampaignPlanRequest,
+  AudiencePreviewDto,
+  AudienceSegment,
+  CampaignAnalyticsDto,
+  CampaignAssetDto,
+  CampaignAssetInput,
+  CampaignAttachInput,
+  CampaignCalendarEntry,
+  CampaignContentDto,
+  CampaignTaskDto,
+  CampaignTaskInput,
+  CreateMarketingCampaignRequest,
+  MarketingCampaignDto,
+  TrackedLinkDto,
+  TrackedLinkInput,
+  UpdateMarketingCampaignRequest,
 } from '@zatma/validation';
 
 export class ApiError extends Error {
@@ -367,6 +384,44 @@ export function createApiClient(options: ApiClientOptions) {
         insights: (campaignId: string, from: string, to: string) => request<AdInsights>('GET', `/ads/campaigns/${id(campaignId)}/insights`, undefined, { from, to }),
       },
     },
+    /** Multi-channel campaigns (Phase 12). Status changes here never activate ads or start spend. */
+    campaigns: {
+      list: (query?: { type?: string; status?: string; channel?: string; ownerId?: string; workspaceId?: string; q?: string; from?: string; to?: string; page?: number; pageSize?: number }) =>
+        request<Paginated<MarketingCampaignDto>>('GET', '/campaigns', undefined, query),
+      get: (campaignId: string) => request<MarketingCampaignDto>('GET', `/campaigns/${id(campaignId)}`),
+      create: (input: CreateMarketingCampaignRequest) => request<MarketingCampaignDto>('POST', '/campaigns', input),
+      update: (campaignId: string, input: UpdateMarketingCampaignRequest) => request<MarketingCampaignDto>('PATCH', `/campaigns/${id(campaignId)}`, input),
+      remove: (campaignId: string) => request<void>('DELETE', `/campaigns/${id(campaignId)}`),
+      ready: (campaignId: string, ready: boolean) => request<MarketingCampaignDto>('POST', `/campaigns/${id(campaignId)}/ready`, { ready }),
+      pause: (campaignId: string, input: { pauseAds?: boolean; unschedulePosts?: boolean } = {}) => request<CampaignStopResult>('POST', `/campaigns/${id(campaignId)}/pause`, input),
+      cancel: (campaignId: string, input: { pauseAds?: boolean; unschedulePosts?: boolean } = {}) => request<CampaignStopResult>('POST', `/campaigns/${id(campaignId)}/cancel`, input),
+      /** Clears a pause. Paused ads are listed, never activated. */
+      resume: (campaignId: string) => request<{ campaign: MarketingCampaignDto; pausedAds: { id: string; name: string; platform: string }[] }>('POST', `/campaigns/${id(campaignId)}/resume`),
+      attach: (campaignId: string, input: Partial<CampaignAttachInput> & Pick<CampaignAttachInput, 'kind' | 'ids'>) => request<{ updated: number }>('POST', `/campaigns/${id(campaignId)}/attach`, input),
+      content: (campaignId: string) => request<CampaignContentDto>('GET', `/campaigns/${id(campaignId)}/content`),
+      leads: (campaignId: string, query?: { page?: number; pageSize?: number }) => request<Paginated<LeadDto>>('GET', `/campaigns/${id(campaignId)}/leads`, undefined, query),
+      analytics: (campaignId: string, from: string, to: string) => request<CampaignAnalyticsDto>('GET', `/campaigns/${id(campaignId)}/analytics`, undefined, { from, to }),
+      calendar: (query: { from: string; to: string; workspaceId?: string; campaignId?: string }) => request<CampaignCalendarEntry[]>('GET', '/campaigns/calendar', undefined, query),
+      audiencePreview: (segment: Partial<AudienceSegment>) => request<AudiencePreviewDto>('POST', '/campaigns/audience/preview', segment),
+      aiPlan: (input: Partial<AiCampaignPlanRequest> & Pick<AiCampaignPlanRequest, 'brief'>) => request<AiCampaignPlanDto>('POST', '/campaigns/ai/plan', input),
+      assets: {
+        list: (campaignId: string) => request<CampaignAssetDto[]>('GET', `/campaigns/${id(campaignId)}/assets`),
+        add: (campaignId: string, input: Partial<CampaignAssetInput>) => request<CampaignAssetDto[]>('POST', `/campaigns/${id(campaignId)}/assets`, input),
+        remove: (campaignId: string, assetId: string) => request<void>('DELETE', `/campaigns/${id(campaignId)}/assets/${encodeURIComponent(assetId)}`),
+      },
+      tasks: {
+        list: (campaignId: string) => request<CampaignTaskDto[]>('GET', `/campaigns/${id(campaignId)}/tasks`),
+        add: (campaignId: string, input: Partial<CampaignTaskInput> & Pick<CampaignTaskInput, 'title'>) => request<CampaignTaskDto>('POST', `/campaigns/${id(campaignId)}/tasks`, input),
+        update: (campaignId: string, taskId: string, input: Partial<CampaignTaskInput>) => request<CampaignTaskDto>('PATCH', `/campaigns/${id(campaignId)}/tasks/${id(taskId)}`, input),
+        remove: (campaignId: string, taskId: string) => request<void>('DELETE', `/campaigns/${id(campaignId)}/tasks/${id(taskId)}`),
+      },
+      links: {
+        list: (campaignId: string) => request<TrackedLinkDto[]>('GET', `/campaigns/${id(campaignId)}/links`),
+        create: (campaignId: string, input: Partial<TrackedLinkInput> & Pick<TrackedLinkInput, 'destinationUrl'>) => request<TrackedLinkDto>('POST', `/campaigns/${id(campaignId)}/links`, input),
+        update: (campaignId: string, linkId: string, input: Partial<TrackedLinkInput>) => request<TrackedLinkDto>('PATCH', `/campaigns/${id(campaignId)}/links/${id(linkId)}`, input),
+        remove: (campaignId: string, linkId: string) => request<void>('DELETE', `/campaigns/${id(campaignId)}/links/${id(linkId)}`),
+      },
+    },
     copyAssets: {
       list: (query?: { page?: number; pageSize?: number; q?: string; kind?: string; language?: string; favorite?: 'true' | 'false' }) =>
         request<Paginated<CopyAssetDto>>('GET', '/copy-assets', undefined, query),
@@ -393,3 +448,9 @@ export function createApiClient(options: ApiClientOptions) {
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;
+
+export interface CampaignStopResult {
+  campaign: MarketingCampaignDto;
+  ads: { id: string; name: string; ok: boolean; error?: string }[];
+  posts: { id: string; caption: string; ok: boolean; error?: string }[];
+}

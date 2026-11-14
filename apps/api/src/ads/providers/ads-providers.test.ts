@@ -42,6 +42,25 @@ const metaPlan = (over: Partial<CampaignPlan> = {}, cr: Partial<MetaCreative> = 
 const G = (p: string) => (u: URL) => u.pathname === `/v24.0/${p}`;
 
 describe('MetaAdsAdapter', () => {
+  it('reads lead-form submissions for an ad, newer than the watermark, across pages', async () => {
+    const { impl, calls } = fakeFetch([
+      (u) =>
+        u.pathname === '/v24.0/ad-1/leads' && !u.searchParams.get('after')
+          ? { body: { data: [{ id: 'L1', created_time: '2026-11-12T05:00:00+0000', form_id: 'F1', field_data: [{ name: 'FULL_NAME', values: ['Deepa Nair'] }, { name: 'phone_number', values: ['+919847000099'] }] }], paging: { next: 'https://graph.test/v24.0/ad-1/leads?after=c2&access_token=tok' } } }
+          : undefined,
+      (u) => (u.searchParams.get('after') === 'c2' ? { body: { data: [{ id: 'L2', created_time: '2026-11-12T06:00:00+0000', field_data: [] }] } } : undefined),
+    ]);
+    const leads = await new MetaAdsAdapter(META, impl).listLeads(ctx(), 'ad-1', new Date('2026-11-12T00:00:00Z'));
+    expect(leads).toEqual([
+      { externalId: 'L1', createdAt: '2026-11-12T05:00:00+0000', formId: 'F1', fields: { full_name: 'Deepa Nair', phone_number: '+919847000099' } },
+      { externalId: 'L2', createdAt: '2026-11-12T06:00:00+0000', formId: null, fields: {} },
+    ]);
+    const first = calls[0]!.url;
+    expect(JSON.parse(first.searchParams.get('filtering')!)).toEqual([{ field: 'time_created', operator: 'GREATER_THAN', value: Date.UTC(2026, 10, 12) / 1000 }]);
+    expect(first.searchParams.get('appsecret_proof')).toMatch(/^[0-9a-f]{64}$/);
+    expect(calls.every((c) => c.method === 'GET')).toBe(true);
+  });
+
   it('requests Marketing API permissions at login', () => {
     const url = new URL(new MetaAdsAdapter(META).authorizeUrl({ state: 's', redirectUri: 'https://api.test/cb' }));
     expect(url.searchParams.get('scope')).toContain('ads_management');

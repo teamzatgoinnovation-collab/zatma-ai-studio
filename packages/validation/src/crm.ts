@@ -248,6 +248,10 @@ const personFields = {
 
 // ───────────── Leads ─────────────
 
+const utmPart = z.string().trim().min(1).max(100).optional();
+export const leadUtmSchema = z.object({ source: utmPart, medium: utmPart, campaign: utmPart, content: utmPart, term: utmPart }).strict();
+export type LeadUtm = z.infer<typeof leadUtmSchema>;
+
 export const createLeadSchema = z
   .object({
     ...personFields,
@@ -260,6 +264,9 @@ export const createLeadSchema = z
     source: z.enum(LEAD_SOURCES).default('other'),
     sourceDetail: opt(200),
     notes: opt(4000),
+    /** UTM parameters from the landing page; `utm.campaign` attributes the lead to a matching campaign (Phase 12). */
+    utm: leadUtmSchema.nullable().optional(),
+    campaignId: uuid.nullable().optional(),
     /** Create even if a lead/contact with the same email or phone exists. */
     allowDuplicate: z.boolean().default(false),
   })
@@ -486,6 +493,9 @@ export interface LeadDto extends PersonDto {
   convertedContactId: string | null;
   convertedDealId: string | null;
   convertedAt: string | null;
+  /** Campaign the lead is attributed to (Phase 12) */
+  campaign: { id: string; name: string; code: string } | null;
+  utm: LeadUtm | null;
 }
 
 export interface ContactDto extends PersonDto {

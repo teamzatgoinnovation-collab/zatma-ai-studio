@@ -233,3 +233,4 @@ export * from './social.js';
 export * from './publishing.js';
 export { withoutDefaults } from './patch.js';
 export * from './ads.js';
+export * from './campaigns.js';

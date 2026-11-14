@@ -9,7 +9,11 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@zatma/ui'],
   // Same-origin proxy to the API so Better Auth session cookies stay first-party.
   async rewrites() {
-    return [{ source: '/api/:path*', destination: `${apiUrl}/api/:path*` }];
+    return [
+      { source: '/api/:path*', destination: `${apiUrl}/api/:path*` },
+      // Tracked campaign short links (Phase 12)
+      { source: '/r/:slug', destination: `${apiUrl}/api/v1/r/:slug` },
+    ];
   },
   async headers() {
     return [

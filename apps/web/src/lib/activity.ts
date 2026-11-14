@@ -53,6 +53,19 @@ const LABELS: Record<string, string> = {
   'ads.campaign_deleted': 'deleted an ad campaign',
   'ads.status_changed_on_platform': 'saw an ad campaign change on the platform',
   'ads.reauth_required': 'was told an ad connection needs reconnecting',
+  'campaigns.created': 'created a campaign',
+  'campaigns.updated': 'updated a campaign',
+  'campaigns.deleted': 'deleted a campaign',
+  'campaigns.marked_ready': 'marked a campaign ready',
+  'campaigns.back_to_draft': 'moved a campaign back to draft',
+  'campaigns.paused': 'paused a campaign',
+  'campaigns.cancelled': 'cancelled a campaign',
+  'campaigns.resumed': 'resumed a campaign',
+  'campaigns.attached': 'added items to a campaign',
+  'campaigns.detached': 'removed items from a campaign',
+  'campaigns.link_created': 'created a tracked link',
+  'campaigns.link_deleted': 'deleted a tracked link',
+  'campaigns.lead_imported': 'imported a lead from a Meta lead form',
 };
 
 /** Human-readable sentence for an audit action code (falls back to the code itself). */

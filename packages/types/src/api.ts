@@ -61,6 +61,8 @@ export interface PlanLimits {
   postsPerMonth: number;
   /** Connected ad accounts (Meta + Google Ads, Phase 11). */
   adAccounts: number;
+  /** Campaigns that are not completed or cancelled (Phase 12). */
+  campaigns: number;
 }
 
 export interface PlanSummary {

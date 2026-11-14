@@ -113,8 +113,9 @@ export class CrmContext {
 
 // ───────────── DTO mappers ─────────────
 
-export const leadInclude = { owner: OWNER_SELECT } satisfies Prisma.LeadInclude;
-export function toLeadDto(l: Lead & WithOwner): LeadDto {
+export const leadInclude = { owner: OWNER_SELECT, campaign: { select: { id: true, name: true, number: true } } } satisfies Prisma.LeadInclude;
+export const campaignCode = (n: number) => `CMP-${String(n).padStart(4, '0')}`;
+export function toLeadDto(l: Lead & WithOwner & { campaign?: { id: string; name: string; number: number } | null }): LeadDto {
   return {
     id: l.id,
     firstName: l.firstName,
@@ -144,6 +145,8 @@ export function toLeadDto(l: Lead & WithOwner): LeadDto {
     convertedContactId: l.convertedContactId,
     convertedDealId: l.convertedDealId,
     convertedAt: iso(l.convertedAt),
+    campaign: l.campaign ? { id: l.campaign.id, name: l.campaign.name, code: campaignCode(l.campaign.number) } : null,
+    utm: (l.utm as LeadDto['utm']) ?? null,
     createdAt: l.createdAt.toISOString(),
     updatedAt: l.updatedAt.toISOString(),
   };

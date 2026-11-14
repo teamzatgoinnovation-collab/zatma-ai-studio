@@ -105,6 +105,7 @@ export class AdsService {
       objective: r.objective as AdCampaignDto['objective'],
       status: r.status,
       source: r.source as AdCampaignDto['source'],
+      marketingCampaignId: r.marketingCampaignId,
       budgetType: r.budgetType,
       budgetAmount: budget.budgetAmount,
       currency: r.currency,
@@ -228,12 +229,19 @@ export class AdsService {
         currency: account.currency,
         startAt: input.startAt ? new Date(input.startAt) : null,
         endAt: input.endAt ? new Date(input.endAt) : null,
+        marketingCampaignId: await this.assertMarketingCampaign(input.marketingCampaignId),
         createdById: TenantContext.get()?.userId ?? null,
         adGroups: { create: this.groupsCreate(organizationId, input.adGroups) },
       },
     });
     await this.audit.record('ads.campaign_created', 'ad_campaign', c.id, { platform, name: input.name });
     return this.get(c.id);
+  }
+
+  private async assertMarketingCampaign(id: string | null | undefined): Promise<string | null> {
+    if (!id) return null;
+    if (!(await this.db.campaign.findFirst({ where: { id, deletedAt: null }, select: { id: true } }))) throw notFound('Campaign');
+    return id;
   }
 
   async update(id: string, input: UpdateCampaignInput): Promise<AdCampaignDto> {
@@ -250,6 +258,7 @@ export class AdsService {
           ...(input.budgetAmount !== undefined ? { budgetAmount: input.budgetAmount } : {}),
           ...(input.startAt !== undefined ? { startAt: input.startAt ? new Date(input.startAt) : null } : {}),
           ...(input.endAt !== undefined ? { endAt: input.endAt ? new Date(input.endAt) : null } : {}),
+          ...(input.marketingCampaignId !== undefined ? { marketingCampaignId: await this.assertMarketingCampaign(input.marketingCampaignId) } : {}),
           ...(r.status === 'ERROR' ? { status: 'DRAFT' as const, error: null, syncState: {} } : {}),
         },
       });

@@ -13,6 +13,6 @@ import { AdsProcessor, AdsScheduler, AdsWorkerService } from './ads.worker.js';
   imports: [BullModule.registerQueue({ name: ADS_SYNC_QUEUE }), SocialModule, StorageModule, CopyModule],
   controllers: [AdsController, AdsOAuthController],
   providers: [AdsRegistry, AdsAccountsService, AdsService, AdsWorkerService, AdsScheduler, AdsProcessor],
-  exports: [AdsService],
+  exports: [AdsService, AdsAccountsService],
 })
 export class AdsModule {}
